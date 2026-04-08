@@ -122,14 +122,28 @@ export default function StudentPage() {
 
           <div className="field">
             <label htmlFor="clasa">Clasa</label>
-            <input
+            <select
               id="clasa"
-              type="text"
               value={clasa}
               onChange={e => setClasa(e.target.value)}
-              placeholder="ex: XI-A"
               disabled={loading}
-            />
+            >
+              <option value="">— Alege clasa —</option>
+              <optgroup label="Clasele V–IX">
+                {['V','VI','VII','VIII','IX'].flatMap(cls =>
+                  ['A','B','C'].map(lit => (
+                    <option key={`${cls}-${lit}`} value={`${cls}-${lit}`}>{cls}-{lit}</option>
+                  ))
+                )}
+              </optgroup>
+              <optgroup label="Clasele X–XII">
+                {['X','XI','XII'].flatMap(cls =>
+                  ['REAL','UMAN'].map(profil => (
+                    <option key={`${cls}-${profil}`} value={`${cls}-${profil}`}>{cls}-{profil}</option>
+                  ))
+                )}
+              </optgroup>
+            </select>
           </div>
 
           {validationError && <p className="error-msg">{validationError}</p>}
