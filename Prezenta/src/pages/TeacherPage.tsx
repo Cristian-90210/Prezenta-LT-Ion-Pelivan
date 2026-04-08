@@ -80,7 +80,10 @@ export default function TeacherPage() {
     setDeleteConfirm(null);
   }
 
-  const classes = [...new Set(records.map(r => r.clasa))].sort();
+  const ALL_CLASSES = [
+    ...['V','VI','VII','VIII','IX'].flatMap(cls => ['A','B','C'].map(lit => `${cls}-${lit}`)),
+    ...['X','XI','XII'].flatMap(cls => ['REAL','UMAN'].map(profil => `${cls}-${profil}`)),
+  ];
   const filtered = filterClasa ? records.filter(r => r.clasa === filterClasa) : records;
 
   if (view === 'login') {
@@ -168,9 +171,16 @@ export default function TeacherPage() {
                 onChange={e => setFilterClasa(e.target.value)}
               >
                 <option value="">Toate clasele</option>
-                {classes.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+                <optgroup label="Clasele V–IX">
+                  {ALL_CLASSES.filter(c => ['V','VI','VII','VIII','IX'].some(cls => c.startsWith(cls + '-'))).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Clasele X–XII">
+                  {ALL_CLASSES.filter(c => ['X','XI','XII'].some(cls => c.startsWith(cls + '-'))).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
           </div>
