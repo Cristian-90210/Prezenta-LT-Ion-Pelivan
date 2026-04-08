@@ -378,6 +378,30 @@ html, body, #root {
   font-weight: 600;
 }
 
+/* ── Firebase error ── */
+.firebase-error {
+  background: var(--red-light);
+  border: 1.5px solid #fca5a5;
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  color: var(--red);
+}
+.firebase-error strong { display: block; margin-bottom: 6px; font-size: 1rem; }
+.firebase-error p { font-size: 0.875rem; line-height: 1.5; }
+
+/* ── Error card ── */
+.error-card { border-top: 5px solid var(--red); }
+.error-icon {
+  width: 72px; height: 72px;
+  background: var(--red-light);
+  color: var(--red);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2rem; font-weight: 700;
+  margin: 32px auto 16px;
+}
+.error-card h1 { text-align: center; font-size: 1.4rem; padding: 0 24px; }
+
 /* ── Empty state ── */
 .empty-state {
   background: #fff;

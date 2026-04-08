@@ -17,32 +17,49 @@ export default function TeacherPage() {
   const [filterClasa, setFilterClasa] = useState('');
   const [qrVisible, setQrVisible] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [fbError, setFbError] = useState('');
+  const [fbLoading, setFbLoading] = useState(false);
 
   const siteUrl = window.location.origin;
 
   useEffect(() => {
     if (view !== 'dashboard') return;
 
+    setFbError('');
+    setFbLoading(true);
+
     const q = query(
       collection(db, 'prezenta'),
       where('data', '==', selectedDate)
     );
 
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const data: AttendanceRecord[] = snapshot.docs.map(d => ({
-        id: d.id,
-        prenume: d.data().prenume,
-        nume: d.data().nume,
-        clasa: d.data().clasa,
-        timestamp: d.data().timestamp?.toDate() ?? new Date(),
-        data: d.data().data,
-      }));
-      // Sortare client-side după oră (evită necesitatea index compus în Firestore)
-      data.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-      setRecords(data);
-    }, err => {
-      console.error('Firestore error:', err);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      snapshot => {
+        setFbLoading(false);
+        const data: AttendanceRecord[] = snapshot.docs.map(d => ({
+          id: d.id,
+          prenume: d.data().prenume ?? '',
+          nume: d.data().nume ?? '',
+          clasa: d.data().clasa ?? '',
+          timestamp: d.data().timestamp?.toDate() ?? new Date(),
+          data: d.data().data ?? selectedDate,
+        }));
+        data.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        setRecords(data);
+      },
+      err => {
+        setFbLoading(false);
+        console.error('Firestore error:', err);
+        if (err.code === 'permission-denied') {
+          setFbError('Acces refuzat de Firestore. Verifică regulile de securitate în Firebase Console → Firestore → Rules și setează-le pe "test mode".');
+        } else if (err.message?.includes('projectId')) {
+          setFbError('Firebase nu este configurat. Adaugă variabilele de mediu VITE_FIREBASE_* în setările Vercel.');
+        } else {
+          setFbError(`Eroare Firebase: ${err.message}`);
+        }
+      }
+    );
 
     return () => unsubscribe();
   }, [view, selectedDate]);
@@ -124,6 +141,13 @@ export default function TeacherPage() {
           </div>
         )}
 
+        {fbError && (
+          <div className="firebase-error">
+            <strong>⚠ Problemă Firebase</strong>
+            <p>{fbError}</p>
+          </div>
+        )}
+
         <div className="controls">
           <div className="control-row">
             <div className="field">
@@ -157,13 +181,17 @@ export default function TeacherPage() {
             {filterClasa ? ` în clasa ${filterClasa}` : ''}
           </span>
           <span className="stat-date">
-            {new Date(selectedDate).toLocaleDateString('ro-RO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {new Date(selectedDate + 'T12:00:00').toLocaleDateString('ro-RO', {
+              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            })}
           </span>
         </div>
 
-        {filtered.length === 0 ? (
+        {fbLoading ? (
+          <div className="empty-state">Se încarcă datele...</div>
+        ) : filtered.length === 0 && !fbError ? (
           <div className="empty-state">
-            <p>Niciun elev nu a marcat prezența {filterClasa ? `pentru clasa ${filterClasa}` : ''} în această zi.</p>
+            Niciun elev nu a marcat prezența{filterClasa ? ` pentru clasa ${filterClasa}` : ''} în această zi.
           </div>
         ) : (
           <div className="attendance-table-wrap">
@@ -191,8 +219,8 @@ export default function TeacherPage() {
                     <td>
                       {deleteConfirm === r.id ? (
                         <span className="delete-confirm">
-                          <button className="btn-danger-sm" onClick={() => handleDelete(r.id)}>Da, șterge</button>
-                          <button className="btn-cancel-sm" onClick={() => setDeleteConfirm(null)}>Anulează</button>
+                          <button className="btn-danger-sm" onClick={() => handleDelete(r.id)}>Da</button>
+                          <button className="btn-cancel-sm" onClick={() => setDeleteConfirm(null)}>Nu</button>
                         </span>
                       ) : (
                         <button className="btn-delete" onClick={() => setDeleteConfirm(r.id)} title="Șterge">✕</button>

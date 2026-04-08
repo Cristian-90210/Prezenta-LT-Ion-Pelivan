@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { collection, addDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
-type Step = 'form' | 'success' | 'duplicate';
+type Step = 'form' | 'success' | 'error';
 
 export default function StudentPage() {
   const [prenume, setPrenume] = useState('');
@@ -10,43 +10,30 @@ export default function StudentPage() {
   const [clasa, setClasa] = useState('');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<Step>('form');
-  const [error, setError] = useState('');
+  const [validationError, setValidationError] = useState('');
 
   const today = new Date().toISOString().split('T')[0];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setValidationError('');
 
     const prenumeTrim = prenume.trim();
     const numeTrim = nume.trim();
     const clasaTrim = clasa.trim();
 
     if (!prenumeTrim || !numeTrim || !clasaTrim) {
-      setError('Completează toate câmpurile.');
+      setValidationError('Completează toate câmpurile.');
       return;
     }
 
     setLoading(true);
 
+    // Arată succes imediat — nu mai așteaptă confirmarea Firebase
+    setStep('success');
+
+    // Salvare în fundal
     try {
-      // Verifică duplicate: query simplu pe dată, filtrare client-side (fără index compus)
-      const q = query(
-        collection(db, 'prezenta'),
-        where('data', '==', today)
-      );
-      const existing = await getDocs(q);
-      const duplicate = existing.docs.some(d => {
-        const rec = d.data();
-        return rec.prenume === prenumeTrim && rec.nume === numeTrim && rec.clasa === clasaTrim;
-      });
-
-      if (duplicate) {
-        setStep('duplicate');
-        setLoading(false);
-        return;
-      }
-
       await addDoc(collection(db, 'prezenta'), {
         prenume: prenumeTrim,
         nume: numeTrim,
@@ -54,15 +41,18 @@ export default function StudentPage() {
         data: today,
         timestamp: Timestamp.now(),
       });
-
-      setStep('success');
     } catch (err) {
-      setError('Eroare de conexiune. Încearcă din nou.');
-      console.error(err);
+      console.error('Eroare la salvare:', err);
+      // Dacă salvarea eșuează, revenin la formular cu mesaj de eroare
+      setStep('error');
     } finally {
       setLoading(false);
     }
   }
+
+  const dateStr = new Date().toLocaleDateString('ro-RO', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
 
   if (step === 'success') {
     return (
@@ -70,25 +60,24 @@ export default function StudentPage() {
         <div className="card success-card">
           <div className="success-icon">✓</div>
           <h1>Prezența a fost înregistrată!</h1>
-          <p className="success-sub">
-            {prenume} {nume} — Clasa {clasa}
-          </p>
-          <p className="success-date">{new Date().toLocaleDateString('ro-RO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p className="success-sub">{prenume} {nume} — Clasa {clasa}</p>
+          <p className="success-date">{dateStr}</p>
         </div>
       </div>
     );
   }
 
-  if (step === 'duplicate') {
+  if (step === 'error') {
     return (
       <div className="page-center">
-        <div className="card info-card">
-          <div className="info-icon">ℹ</div>
-          <h1>Prezența deja înregistrată</h1>
-          <p className="success-sub">
-            {prenume} {nume} — Clasa {clasa}
-          </p>
-          <p className="success-date">Ai marcat deja prezența azi.</p>
+        <div className="card error-card">
+          <div className="error-icon">!</div>
+          <h1>Eroare de conexiune</h1>
+          <p className="success-sub">Nu s-a putut salva prezența.</p>
+          <p className="success-date">Verificați conexiunea la internet și reîncercați.</p>
+          <div style={{ padding: '0 28px 28px' }}>
+            <button className="btn-primary" onClick={() => setStep('form')}>Încearcă din nou</button>
+          </div>
         </div>
       </div>
     );
@@ -100,9 +89,7 @@ export default function StudentPage() {
         <div className="card-header">
           <div className="school-icon">🎓</div>
           <h1>Înregistrare Prezență</h1>
-          <p className="subtitle">
-            {new Date().toLocaleDateString('ro-RO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+          <p className="subtitle">{dateStr}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="form">
@@ -116,6 +103,7 @@ export default function StudentPage() {
               placeholder="ex: Ion"
               autoComplete="given-name"
               disabled={loading}
+              autoFocus
             />
           </div>
 
@@ -144,7 +132,7 @@ export default function StudentPage() {
             />
           </div>
 
-          {error && <p className="error-msg">{error}</p>}
+          {validationError && <p className="error-msg">{validationError}</p>}
 
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? 'Se înregistrează...' : 'Marchează Prezența'}
