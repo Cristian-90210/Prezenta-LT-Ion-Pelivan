@@ -1,3 +1,5 @@
 {
+  "buildCommand": "cd Prezenta && npm install && npm run build",
+  "outputDirectory": "Prezenta/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
