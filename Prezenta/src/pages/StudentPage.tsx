@@ -32,7 +32,16 @@ export default function StudentPage() {
     // Arată succes imediat — nu mai așteaptă confirmarea Firebase
     setStep('success');
 
-    // Salvare în fundal
+    // Obține IP-ul și salvează în fundal
+    let ip = 'necunoscut';
+    try {
+      const res = await fetch('https://api.ipify.org?format=json');
+      const json = await res.json();
+      ip = json.ip ?? 'necunoscut';
+    } catch {
+      // IP rămâne 'necunoscut' dacă fetch-ul eșuează
+    }
+
     try {
       await addDoc(collection(db, 'prezenta'), {
         prenume: prenumeTrim,
@@ -40,10 +49,10 @@ export default function StudentPage() {
         clasa: clasaTrim,
         data: today,
         timestamp: Timestamp.now(),
+        ip,
       });
     } catch (err) {
       console.error('Eroare la salvare:', err);
-      // Dacă salvarea eșuează, revenin la formular cu mesaj de eroare
       setStep('error');
     } finally {
       setLoading(false);

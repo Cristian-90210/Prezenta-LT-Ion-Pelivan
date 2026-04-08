@@ -5,4 +5,5 @@ export interface AttendanceRecord {
   clasa: string;
   timestamp: Date;
   data: string;
+  ip?: string;
 }

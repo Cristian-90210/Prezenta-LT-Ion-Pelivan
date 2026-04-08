@@ -44,6 +44,7 @@ export default function TeacherPage() {
           clasa: d.data().clasa ?? '',
           timestamp: d.data().timestamp?.toDate() ?? new Date(),
           data: d.data().data ?? selectedDate,
+          ip: d.data().ip ?? '—',
         }));
         data.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
         setRecords(data);
@@ -203,6 +204,7 @@ export default function TeacherPage() {
                   <th>Nume</th>
                   <th>Clasa</th>
                   <th>Ora</th>
+                  <th>IP</th>
                   <th></th>
                 </tr>
               </thead>
@@ -216,6 +218,7 @@ export default function TeacherPage() {
                     <td className="td-time">
                       {r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
                     </td>
+                    <td className="td-ip">{r.ip ?? '—'}</td>
                     <td>
                       {deleteConfirm === r.id ? (
                         <span className="delete-confirm">

@@ -367,6 +367,7 @@ html, body, #root {
 
 .td-nr { color: var(--gray-400); font-size: 0.85rem; width: 40px; }
 .td-time { color: var(--gray-400); font-size: 0.85rem; white-space: nowrap; }
+.td-ip { color: var(--gray-400); font-size: 0.78rem; font-family: monospace; white-space: nowrap; }
 
 .badge {
   display: inline-block;
