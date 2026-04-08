@@ -30,17 +30,18 @@ export default function StudentPage() {
     setLoading(true);
 
     try {
-      // Verifică dacă elevul a mai marcat prezența azi
+      // Verifică duplicate: query simplu pe dată, filtrare client-side (fără index compus)
       const q = query(
         collection(db, 'prezenta'),
-        where('data', '==', today),
-        where('prenume', '==', prenumeTrim),
-        where('nume', '==', numeTrim),
-        where('clasa', '==', clasaTrim)
+        where('data', '==', today)
       );
       const existing = await getDocs(q);
+      const duplicate = existing.docs.some(d => {
+        const rec = d.data();
+        return rec.prenume === prenumeTrim && rec.nume === numeTrim && rec.clasa === clasaTrim;
+      });
 
-      if (!existing.empty) {
+      if (duplicate) {
         setStep('duplicate');
         setLoading(false);
         return;
