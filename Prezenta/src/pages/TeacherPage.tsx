@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { db } from '../firebase';
 import type { AttendanceRecord } from '../types';
@@ -25,8 +25,7 @@ export default function TeacherPage() {
 
     const q = query(
       collection(db, 'prezenta'),
-      where('data', '==', selectedDate),
-      orderBy('timestamp', 'asc')
+      where('data', '==', selectedDate)
     );
 
     const unsubscribe = onSnapshot(q, snapshot => {
@@ -38,7 +37,11 @@ export default function TeacherPage() {
         timestamp: d.data().timestamp?.toDate() ?? new Date(),
         data: d.data().data,
       }));
+      // Sortare client-side după oră (evită necesitatea index compus în Firestore)
+      data.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
       setRecords(data);
+    }, err => {
+      console.error('Firestore error:', err);
     });
 
     return () => unsubscribe();
