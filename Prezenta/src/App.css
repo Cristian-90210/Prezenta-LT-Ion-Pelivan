@@ -18,17 +18,44 @@
   --radius: 12px;
   --shadow: 0 4px 24px rgba(0,0,0,0.10);
   --shadow-sm: 0 1px 4px rgba(0,0,0,0.07);
+  /* surface tokens */
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --surface-hover: #f9fafb;
+  --border: #e5e7eb;
+  --text: #1f2937;
+  --text-muted: #9ca3af;
+}
+
+/* ── Dark mode ── */
+:root.dark {
+  --blue-light: rgba(37, 99, 235, 0.18);
+  --green-light: rgba(22, 163, 74, 0.18);
+  --red-light: rgba(220, 38, 38, 0.18);
+  --gray-50: #22272e;
+  --gray-100: #2d333b;
+  --gray-200: #373e47;
+  --gray-400: #768390;
+  --gray-600: #adbac7;
+  --gray-800: #cdd9e5;
+  --bg: #0d1117;
+  --surface: #1c2128;
+  --surface-hover: #22272e;
+  --border: #373e47;
+  --text: #cdd9e5;
+  --text-muted: #768390;
 }
 
 html, body, #root {
   height: 100%;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: var(--gray-50);
-  color: var(--gray-800);
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
+  transition: background 0.2s, color 0.2s;
 }
 
-/* ── Centered card layout (student + teacher login) ── */
+/* ── Centered card layout ── */
 .page-center {
   min-height: 100vh;
   display: flex;
@@ -37,9 +64,12 @@ html, body, #root {
   padding: 24px 16px;
   background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
 }
+:root.dark .page-center {
+  background: linear-gradient(135deg, #0d1117 0%, #1a1a2e 100%);
+}
 
 .card {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   width: 100%;
@@ -91,12 +121,12 @@ html, body, #root {
 
 .field input,
 .field select {
-  border: 2px solid var(--gray-200);
+  border: 2px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
   font-size: 1rem;
-  color: var(--gray-800);
-  background: #fff;
+  color: var(--text);
+  background: var(--surface);
   transition: border-color 0.15s;
   width: 100%;
 }
@@ -172,6 +202,18 @@ html, body, #root {
 }
 .btn-delete:hover { color: var(--red); background: var(--red-light); }
 
+.btn-edit {
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.1s, background 0.1s;
+}
+.btn-edit:hover { color: var(--blue); background: var(--blue-light); }
+
 .btn-danger-sm {
   background: var(--red);
   color: #fff;
@@ -192,6 +234,80 @@ html, body, #root {
 }
 
 .delete-confirm { display: flex; gap: 6px; align-items: center; }
+
+/* ── Lock button ── */
+.btn-lock {
+  background: rgba(22, 163, 74, 0.2);
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,0.4);
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-lock:hover { background: rgba(22, 163, 74, 0.35); }
+.btn-lock.locked { background: rgba(220, 38, 38, 0.25); }
+.btn-lock.locked:hover { background: rgba(220, 38, 38, 0.4); }
+.btn-lock:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Lock banner ── */
+.lock-banner {
+  background: var(--red-light);
+  border: 1.5px solid var(--red);
+  color: var(--red);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ── Dark mode toggle (student page) ── */
+.btn-dark-toggle {
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.btn-dark-toggle:hover { color: var(--text); background: var(--gray-100); }
+
+/* ── Edit Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+.modal-box {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+}
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 20px 24px 0;
+  color: var(--text);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
 
 /* ── Success / Info cards ── */
 .success-card { border-top: 5px solid var(--green); }
@@ -232,14 +348,14 @@ html, body, #root {
 .success-date {
   text-align: center;
   font-size: 0.875rem;
-  color: var(--gray-400);
+  color: var(--text-muted);
   margin: 8px 0 32px;
 }
 
 /* ── Teacher dashboard ── */
 .teacher-page {
   min-height: 100vh;
-  background: var(--gray-50);
+  background: var(--bg);
   display: flex;
   flex-direction: column;
 }
@@ -263,10 +379,9 @@ html, body, #root {
   gap: 12px;
   flex-wrap: wrap;
 }
-.header-content h1 {
-  font-size: 1.3rem;
-  font-weight: 700;
-}
+.header-title { display: flex; flex-direction: column; gap: 2px; }
+.header-content h1 { font-size: 1.3rem; font-weight: 700; }
+.header-teacher-name { font-size: 0.8rem; opacity: 0.75; }
 .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 .teacher-main {
@@ -281,7 +396,7 @@ html, body, #root {
 
 /* ── QR Panel ── */
 .qr-panel {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -293,24 +408,24 @@ html, body, #root {
   align-items: center;
   text-align: center;
 }
-.qr-inner h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; }
+.qr-inner h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; color: var(--text); }
 .qr-sub { font-size: 0.875rem; color: var(--gray-600); margin-bottom: 24px; }
 .qr-box {
   background: #fff;
   padding: 16px;
   border-radius: 12px;
-  border: 2px solid var(--gray-200);
+  border: 2px solid var(--border);
 }
 .qr-url {
   margin-top: 14px;
   font-size: 0.8rem;
-  color: var(--gray-400);
+  color: var(--text-muted);
   font-family: monospace;
 }
 
 /* ── Controls ── */
 .controls {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 20px;
@@ -331,13 +446,13 @@ html, body, #root {
   flex-wrap: wrap;
   padding: 0 4px;
 }
-.stat { font-size: 1rem; font-weight: 600; color: var(--gray-800); }
+.stat { font-size: 1rem; font-weight: 600; color: var(--text); }
 .stat strong { color: var(--blue); font-size: 1.3rem; }
-.stat-date { font-size: 0.875rem; color: var(--gray-400); }
+.stat-date { font-size: 0.875rem; color: var(--text-muted); }
 
 /* ── Table ── */
 .attendance-table-wrap {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   overflow-x: auto;
@@ -355,19 +470,19 @@ html, body, #root {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--gray-600);
-  border-bottom: 2px solid var(--gray-200);
+  border-bottom: 2px solid var(--border);
 }
 .attendance-table td {
   padding: 12px 16px;
   border-bottom: 1px solid var(--gray-100);
-  color: var(--gray-800);
+  color: var(--text);
 }
 .attendance-table tr:last-child td { border-bottom: none; }
-.attendance-table tr:hover td { background: var(--gray-50); }
+.attendance-table tr:hover td { background: var(--surface-hover); }
 
-.td-nr { color: var(--gray-400); font-size: 0.85rem; width: 40px; }
-.td-time { color: var(--gray-400); font-size: 0.85rem; white-space: nowrap; }
-.td-ip { color: var(--gray-400); font-size: 0.78rem; font-family: monospace; white-space: nowrap; }
+.td-nr { color: var(--text-muted); font-size: 0.85rem; width: 40px; }
+.td-time { color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; }
+.td-ip { color: var(--text-muted); font-size: 0.78rem; font-family: monospace; white-space: nowrap; }
 
 .badge {
   display: inline-block;
@@ -405,12 +520,12 @@ html, body, #root {
 
 /* ── Empty state ── */
 .empty-state {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 48px 24px;
   text-align: center;
-  color: var(--gray-400);
+  color: var(--text-muted);
   font-size: 1rem;
 }
 
@@ -420,6 +535,7 @@ html, body, #root {
   gap: 0;
   padding: 0 24px;
   border-top: 1px solid rgba(255,255,255,0.15);
+  overflow-x: auto;
 }
 .dash-tab {
   background: transparent;
@@ -431,6 +547,7 @@ html, body, #root {
   font-weight: 600;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
 }
 .dash-tab:hover { color: rgba(255,255,255,0.9); }
 .dash-tab.active {
@@ -449,7 +566,7 @@ html, body, #root {
 .btn-action {
   background: var(--gray-100);
   color: var(--gray-600);
-  border: 1.5px solid var(--gray-200);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   padding: 7px 14px;
   font-size: 0.82rem;
@@ -466,7 +583,7 @@ html, body, #root {
   flex-wrap: wrap;
 }
 .stat-card {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 20px 24px;
@@ -483,12 +600,12 @@ html, body, #root {
 }
 .stat-card-label {
   font-size: 0.8rem;
-  color: var(--gray-400);
+  color: var(--text-muted);
   font-weight: 500;
 }
 
 .bar-chart-panel {
-  background: #fff;
+  background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 24px;
@@ -496,19 +613,11 @@ html, body, #root {
 .bar-chart-panel h3 {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--gray-800);
+  color: var(--text);
   margin-bottom: 20px;
 }
-.bar-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.bar-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+.bar-chart { display: flex; flex-direction: column; gap: 10px; }
+.bar-item { display: flex; align-items: center; gap: 12px; }
 .bar-label {
   font-size: 0.82rem;
   font-weight: 600;
@@ -562,7 +671,7 @@ html, body, #root {
   transition: background 0.15s, color 0.15s;
 }
 .qr-mode-btn.active {
-  background: #fff;
+  background: var(--surface);
   color: var(--blue);
   box-shadow: var(--shadow-sm);
 }
@@ -580,15 +689,11 @@ html, body, #root {
   align-items: center;
   gap: 8px;
   background: var(--gray-50);
-  border: 1.5px solid var(--gray-200);
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   padding: 12px;
 }
-.qr-class-label {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--blue);
-}
+.qr-class-label { font-size: 0.82rem; font-weight: 700; color: var(--blue); }
 
 /* ── Clasa locked (din QR) ── */
 .clasa-locked {
@@ -600,17 +705,10 @@ html, body, #root {
   border: 2px solid var(--blue);
   border-radius: 8px;
 }
-.badge-lg {
-  font-size: 1rem;
-  padding: 4px 14px;
-}
-.clasa-locked-text {
-  font-size: 0.82rem;
-  color: var(--blue);
-  font-weight: 500;
-}
+.badge-lg { font-size: 1rem; padding: 4px 14px; }
+.clasa-locked-text { font-size: 0.82rem; color: var(--blue); font-weight: 500; }
 
-/* ── Buton Search (Istoric) ── */
+/* ── Buton Search ── */
 .field-btn { justify-content: flex-end; }
 .btn-search {
   background: var(--blue);
@@ -634,8 +732,11 @@ html, body, #root {
   justify-content: space-between;
   padding: 12px 16px;
   background: var(--gray-50);
-  border-bottom: 2px solid var(--gray-200);
+  border-bottom: 2px solid var(--border);
   font-size: 0.95rem;
+  color: var(--text);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .istoric-count {
   font-size: 0.82rem;
@@ -646,7 +747,7 @@ html, body, #root {
   padding: 3px 12px;
 }
 
-/* ── Print header (hidden on screen, visible when printing) ── */
+/* ── Print header ── */
 .print-header { display: none; }
 
 /* ── Mobile ── */
@@ -656,7 +757,7 @@ html, body, #root {
   .header-content h1 { font-size: 1.1rem; }
   .attendance-table { font-size: 0.875rem; }
   .attendance-table th, .attendance-table td { padding: 10px 12px; }
-  .dash-tab { padding: 10px 14px; font-size: 0.8rem; }
+  .dash-tab { padding: 10px 12px; font-size: 0.78rem; }
   .stats-summary { gap: 10px; }
   .stat-card { padding: 16px; }
   .stat-card-value { font-size: 1.6rem; }
@@ -669,6 +770,7 @@ html, body, #root {
   .stats-bar,
   .firebase-error,
   .qr-panel,
+  .lock-banner,
   .empty-state { display: none !important; }
 
   .no-print { display: none !important; }
