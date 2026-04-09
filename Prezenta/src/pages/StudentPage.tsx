@@ -1,13 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, addDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { TEACHERS } from '../teachers';
+
+const ALL_CLASSES_V_IX = ['V', 'VI', 'VII', 'VIII', 'IX'].flatMap(cls =>
+  ['A', 'B', 'C'].map(lit => `${cls}-${lit}`)
+);
+const ALL_CLASSES_X_XII = ['X', 'XI', 'XII'].flatMap(cls =>
+  ['REAL', 'UMAN'].map(profil => `${cls}-${profil}`)
+);
 
 type Step = 'form' | 'success' | 'error';
 
 export default function StudentPage() {
   const [searchParams] = useSearchParams();
   const clasaFromUrl = searchParams.get('clasa') ?? '';
+  const materieId = searchParams.get('materie') ?? '';
+  const teacher = TEACHERS.find(t => t.id === materieId) ?? null;
 
   const [prenume, setPrenume] = useState('');
   const [nume, setNume] = useState('');
@@ -15,8 +25,32 @@ export default function StudentPage() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<Step>('form');
   const [validationError, setValidationError] = useState('');
+  const [locked, setLocked] = useState(false);
+  const [lockLoading, setLockLoading] = useState(!!teacher);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
   const today = new Date().toISOString().split('T')[0];
+
+  // ── Dark mode ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('darkMode', String(darkMode));
+  }, [darkMode]);
+
+  // ── Lock check (real-time) ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!teacher) { setLockLoading(false); return; }
+    const lockRef = doc(db, 'settings', 'lock');
+    const unsubscribe = onSnapshot(
+      lockRef,
+      snap => {
+        setLockLoading(false);
+        setLocked(snap.exists() ? snap.data()[teacher.id] === true : false);
+      },
+      () => setLockLoading(false)
+    );
+    return () => unsubscribe();
+  }, [teacher?.id]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,9 +65,14 @@ export default function StudentPage() {
       return;
     }
 
+    if (locked) {
+      setValidationError('Înregistrarea prezentei este momentan blocată de profesor.');
+      return;
+    }
+
     setLoading(true);
 
-    // Verificare anti-duplicat
+    // Anti-duplicate check
     try {
       const dupQuery = query(
         collection(db, 'prezenta'),
@@ -49,21 +88,17 @@ export default function StudentPage() {
         return;
       }
     } catch {
-      // Dacă verificarea eșuează, continuăm oricum
+      // dacă verificarea eșuează, continuăm
     }
 
-    // Afișăm succes după ce verificarea anti-duplicat a trecut
     setStep('success');
 
-    // Obținem IP-ul și salvăm în fundal
     let ip = 'necunoscut';
     try {
       const res = await fetch('https://api.ipify.org?format=json');
       const json = await res.json();
       ip = json.ip ?? 'necunoscut';
-    } catch {
-      // IP rămâne 'necunoscut'
-    }
+    } catch {}
 
     try {
       await addDoc(collection(db, 'prezenta'), {
@@ -73,6 +108,7 @@ export default function StudentPage() {
         data: today,
         timestamp: Timestamp.now(),
         ip,
+        ...(teacher ? { materie: teacher.subject } : {}),
       });
     } catch (err) {
       console.error('Eroare la salvare:', err);
@@ -86,6 +122,7 @@ export default function StudentPage() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
+  // ── Success ───────────────────────────────────────────────────────────────
   if (step === 'success') {
     return (
       <div className="page-center">
@@ -93,12 +130,18 @@ export default function StudentPage() {
           <div className="success-icon">✓</div>
           <h1>Prezența a fost înregistrată!</h1>
           <p className="success-sub">{prenume} {nume} — Clasa {clasa}</p>
+          {teacher && (
+            <p className="success-sub" style={{ fontSize: '0.95rem' }}>
+              Ora de {teacher.subject}
+            </p>
+          )}
           <p className="success-date">{dateStr}</p>
         </div>
       </div>
     );
   }
 
+  // ── Error ─────────────────────────────────────────────────────────────────
   if (step === 'error') {
     return (
       <div className="page-center">
@@ -115,12 +158,44 @@ export default function StudentPage() {
     );
   }
 
+  // ── Locked ────────────────────────────────────────────────────────────────
+  if (!lockLoading && locked && teacher) {
+    return (
+      <div className="page-center">
+        <div className="card">
+          <div className="card-header" style={{ background: '#6b7280' }}>
+            <div className="school-icon">🔒</div>
+            <h1>Înregistrare închisă</h1>
+            <p className="subtitle">Ora de {teacher.subject}</p>
+          </div>
+          <div style={{ padding: '32px 28px', textAlign: 'center' }}>
+            <p style={{ color: 'var(--gray-600)', fontSize: '0.95rem', lineHeight: 1.6 }}>
+              Profesorul a închis înregistrarea prezentei.<br />
+              Contactați profesorul pentru mai multe informații.
+            </p>
+          </div>
+          <div style={{ padding: '0 28px 20px', textAlign: 'right' }}>
+            <button className="btn-dark-toggle" onClick={() => setDarkMode(d => !d)}>
+              {darkMode ? '☀ Mod luminos' : '🌙 Mod întunecat'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Form ──────────────────────────────────────────────────────────────────
   return (
     <div className="page-center">
       <div className="card">
         <div className="card-header">
           <div className="school-icon">🎓</div>
           <h1>Înregistrare Prezență</h1>
+          {teacher && (
+            <p className="subtitle" style={{ fontWeight: 700, opacity: 1, fontSize: '1rem' }}>
+              Ora de {teacher.subject}
+            </p>
+          )}
           <p className="subtitle">{dateStr}</p>
         </div>
 
@@ -163,26 +238,13 @@ export default function StudentPage() {
           ) : (
             <div className="field">
               <label htmlFor="clasa">Clasa</label>
-              <select
-                id="clasa"
-                value={clasa}
-                onChange={e => setClasa(e.target.value)}
-                disabled={loading}
-              >
+              <select id="clasa" value={clasa} onChange={e => setClasa(e.target.value)} disabled={loading}>
                 <option value="">— Alege clasa —</option>
                 <optgroup label="Clasele V–IX">
-                  {['V', 'VI', 'VII', 'VIII', 'IX'].flatMap(cls =>
-                    ['A', 'B', 'C'].map(lit => (
-                      <option key={`${cls}-${lit}`} value={`${cls}-${lit}`}>{cls}-{lit}</option>
-                    ))
-                  )}
+                  {ALL_CLASSES_V_IX.map(c => <option key={c} value={c}>{c}</option>)}
                 </optgroup>
                 <optgroup label="Clasele X–XII">
-                  {['X', 'XI', 'XII'].flatMap(cls =>
-                    ['REAL', 'UMAN'].map(profil => (
-                      <option key={`${cls}-${profil}`} value={`${cls}-${profil}`}>{cls}-{profil}</option>
-                    ))
-                  )}
+                  {ALL_CLASSES_X_XII.map(c => <option key={c} value={c}>{c}</option>)}
                 </optgroup>
               </select>
             </div>
@@ -190,10 +252,20 @@ export default function StudentPage() {
 
           {validationError && <p className="error-msg">{validationError}</p>}
 
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Se verifică...' : 'Marchează Prezența'}
+          <button type="submit" className="btn-primary" disabled={loading || lockLoading}>
+            {loading
+              ? 'Se verifică...'
+              : lockLoading
+              ? 'Se încarcă...'
+              : 'Marchează Prezența'}
           </button>
         </form>
+
+        <div style={{ padding: '0 28px 16px', textAlign: 'right' }}>
+          <button className="btn-dark-toggle" onClick={() => setDarkMode(d => !d)}>
+            {darkMode ? '☀ Mod luminos' : '🌙 Mod întunecat'}
+          </button>
+        </div>
       </div>
     </div>
   );

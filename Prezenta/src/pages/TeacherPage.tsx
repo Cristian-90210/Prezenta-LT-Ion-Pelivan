@@ -1,35 +1,59 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import {
+  collection, query, where, onSnapshot, deleteDoc, doc,
+  getDocs, updateDoc, setDoc,
+} from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { db } from '../firebase';
 import type { AttendanceRecord } from '../types';
-
-const TEACHER_PASSWORD = import.meta.env.VITE_TEACHER_PASSWORD || 'profesor2024';
-
-type View = 'login' | 'dashboard';
-type DashTab = 'lista' | 'statistici' | 'istoric';
+import { TEACHERS, type Teacher } from '../teachers';
 
 const ALL_CLASSES = [
   ...['V', 'VI', 'VII', 'VIII', 'IX'].flatMap(cls => ['A', 'B', 'C'].map(lit => `${cls}-${lit}`)),
   ...['X', 'XI', 'XII'].flatMap(cls => ['REAL', 'UMAN'].map(profil => `${cls}-${profil}`)),
 ];
 
+type View = 'login' | 'dashboard';
+type DashTab = 'lista' | 'statistici' | 'raport' | 'istoric';
+
 export default function TeacherPage() {
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const [view, setView] = useState<View>('login');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(null);
+
+  // ── Dark mode ─────────────────────────────────────────────────────────────
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+
+  // ── Dashboard data ────────────────────────────────────────────────────────
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [filterClasa, setFilterClasa] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [qrVisible, setQrVisible] = useState(false);
-  const [qrMode, setQrMode] = useState<'general' | 'perClasa'>('general');
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [fbError, setFbError] = useState('');
   const [fbLoading, setFbLoading] = useState(false);
   const [dashTab, setDashTab] = useState<DashTab>('lista');
 
-  // Istoric states
+  // ── QR ────────────────────────────────────────────────────────────────────
+  const [qrVisible, setQrVisible] = useState(false);
+  const [qrMode, setQrMode] = useState<'general' | 'perClasa'>('general');
+
+  // ── Lock ──────────────────────────────────────────────────────────────────
+  const [locked, setLocked] = useState(false);
+  const [lockLoading, setLockLoading] = useState(false);
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // ── Edit ──────────────────────────────────────────────────────────────────
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [editPrenume, setEditPrenume] = useState('');
+  const [editNume, setEditNume] = useState('');
+  const [editClasa, setEditClasa] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // ── Istoric ───────────────────────────────────────────────────────────────
   const [istoricPrenume, setIstoricPrenume] = useState('');
   const [istoricNume, setIstoricNume] = useState('');
   const [istoricRecords, setIstoricRecords] = useState<AttendanceRecord[]>([]);
@@ -37,10 +61,28 @@ export default function TeacherPage() {
   const [istoricError, setIstoricError] = useState('');
   const [istoricSearched, setIstoricSearched] = useState(false);
 
+  // ── Raport interval ───────────────────────────────────────────────────────
+  const [rangeFrom, setRangeFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [rangeTo, setRangeTo] = useState(new Date().toISOString().split('T')[0]);
+  const [rangeRecords, setRangeRecords] = useState<AttendanceRecord[]>([]);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeSearched, setRangeSearched] = useState(false);
+
   const siteUrl = window.location.origin;
 
+  // ── Dark mode effect ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (view !== 'dashboard') return;
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('darkMode', String(darkMode));
+  }, [darkMode]);
+
+  // ── Load records for selected date ────────────────────────────────────────
+  useEffect(() => {
+    if (view !== 'dashboard' || !currentTeacher) return;
 
     setFbError('');
     setFbLoading(true);
@@ -62,17 +104,15 @@ export default function TeacherPage() {
           timestamp: d.data().timestamp?.toDate() ?? new Date(),
           data: d.data().data ?? selectedDate,
           ip: d.data().ip ?? '—',
+          materie: d.data().materie ?? '',
         }));
         data.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-        setRecords(data);
+        setRecords(data.filter(r => r.materie === currentTeacher.subject));
       },
       err => {
         setFbLoading(false);
-        console.error('Firestore error:', err);
         if (err.code === 'permission-denied') {
-          setFbError('Acces refuzat de Firestore. Verifică regulile de securitate în Firebase Console → Firestore → Rules și setează-le pe "test mode".');
-        } else if (err.message?.includes('projectId')) {
-          setFbError('Firebase nu este configurat. Adaugă variabilele de mediu VITE_FIREBASE_* în setările Vercel.');
+          setFbError('Acces refuzat de Firestore. Verifică regulile de securitate în Firebase Console.');
         } else {
           setFbError(`Eroare Firebase: ${err.message}`);
         }
@@ -80,15 +120,47 @@ export default function TeacherPage() {
     );
 
     return () => unsubscribe();
-  }, [view, selectedDate]);
+  }, [view, selectedDate, currentTeacher]);
 
+  // ── Subscribe to lock state ───────────────────────────────────────────────
+  useEffect(() => {
+    if (view !== 'dashboard' || !currentTeacher) return;
+    const lockRef = doc(db, 'settings', 'lock');
+    const unsubscribe = onSnapshot(lockRef, snap => {
+      setLocked(snap.exists() ? snap.data()[currentTeacher.id] === true : false);
+    });
+    return () => unsubscribe();
+  }, [view, currentTeacher]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (password === TEACHER_PASSWORD) {
+    const teacher = TEACHERS.find(t => t.password === password);
+    if (teacher) {
+      setCurrentTeacher(teacher);
       setView('dashboard');
       setLoginError('');
     } else {
       setLoginError('Parolă incorectă.');
+    }
+  }
+
+  function handleLogout() {
+    setView('login');
+    setCurrentTeacher(null);
+    setPassword('');
+    setRecords([]);
+  }
+
+  async function handleToggleLock() {
+    if (!currentTeacher) return;
+    setLockLoading(true);
+    try {
+      await setDoc(doc(db, 'settings', 'lock'), { [currentTeacher.id]: !locked }, { merge: true });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLockLoading(false);
     }
   }
 
@@ -97,9 +169,34 @@ export default function TeacherPage() {
     setDeleteConfirm(null);
   }
 
+  function startEdit(record: AttendanceRecord) {
+    setEditingRecord(record);
+    setEditPrenume(record.prenume);
+    setEditNume(record.nume);
+    setEditClasa(record.clasa);
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingRecord) return;
+    setEditSaving(true);
+    try {
+      await updateDoc(doc(db, 'prezenta', editingRecord.id), {
+        prenume: editPrenume.trim(),
+        nume: editNume.trim(),
+        clasa: editClasa,
+      });
+      setEditingRecord(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   async function handleIstoricSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (!istoricPrenume.trim() || !istoricNume.trim()) return;
+    if (!istoricPrenume.trim() || !istoricNume.trim() || !currentTeacher) return;
     setIstoricLoading(true);
     setIstoricError('');
     setIstoricSearched(true);
@@ -118,9 +215,10 @@ export default function TeacherPage() {
         timestamp: d.data().timestamp?.toDate() ?? new Date(),
         data: d.data().data ?? '',
         ip: d.data().ip ?? '—',
+        materie: d.data().materie ?? '',
       }));
       data.sort((a, b) => b.data.localeCompare(a.data));
-      setIstoricRecords(data);
+      setIstoricRecords(data.filter(r => r.materie === currentTeacher.subject));
     } catch (err) {
       console.error(err);
       setIstoricError('Eroare la căutare în baza de date.');
@@ -129,30 +227,138 @@ export default function TeacherPage() {
     }
   }
 
-  function exportCSV() {
-    const rows = [
-      ['Nr', 'Prenume', 'Nume', 'Clasa', 'Ora', 'IP'],
-      ...filtered.map((r, i) => [
-        String(i + 1),
-        r.prenume,
-        r.nume,
-        r.clasa,
-        r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
-        r.ip ?? '—',
-      ]),
-    ];
-    const csv = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\r\n');
+  async function handleRangeSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!currentTeacher) return;
+    setRangeLoading(true);
+    setRangeSearched(true);
+    try {
+      const q = query(
+        collection(db, 'prezenta'),
+        where('data', '>=', rangeFrom),
+        where('data', '<=', rangeTo)
+      );
+      const snapshot = await getDocs(q);
+      const data: AttendanceRecord[] = snapshot.docs.map(d => ({
+        id: d.id,
+        prenume: d.data().prenume ?? '',
+        nume: d.data().nume ?? '',
+        clasa: d.data().clasa ?? '',
+        timestamp: d.data().timestamp?.toDate() ?? new Date(),
+        data: d.data().data ?? '',
+        ip: d.data().ip ?? '—',
+        materie: d.data().materie ?? '',
+      }));
+      setRangeRecords(data.filter(r => r.materie === currentTeacher.subject));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRangeLoading(false);
+    }
+  }
+
+  // ── CSV helpers ───────────────────────────────────────────────────────────
+  // null = rând gol (separator vizual); string[] = rând cu valori citate
+  function downloadCSV(rows: (string[] | null)[], filename: string) {
+    const csv = rows
+      .map(row => row === null ? '' : row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\r\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `prezenta-${selectedDate}${filterClasa ? '-' + filterClasa : ''}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 
+  function exportCSV() {
+    const dateLong = new Date(selectedDate + 'T12:00:00').toLocaleDateString('ro-RO', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    downloadCSV(
+      [
+        [`=== PREZENȚĂ — ${currentTeacher?.subject ?? ''} ===`],
+        ['Data:', dateLong],
+        ...(filterClasa ? [['Clasa:', filterClasa]] : []) as (string[])[],
+        ['Total prezenți:', String(filtered.length)],
+        ['---'],
+        null,
+        ['#', 'Prenume', 'Nume', 'Clasa', 'Ora', 'IP'],
+        ...filtered.map((r, i) => [
+          String(i + 1), r.prenume, r.nume, r.clasa,
+          r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+          r.ip ?? '—',
+        ]),
+      ],
+      `prezenta-${selectedDate}${filterClasa ? '-' + filterClasa : ''}.csv`
+    );
+  }
+
+  function exportIstoricCSV() {
+    downloadCSV(
+      [
+        [`=== ISTORIC ELEV — ${currentTeacher?.subject ?? ''} ===`],
+        ['Elev:', `${istoricPrenume} ${istoricNume}`],
+        ['Total zile prezent:', String(istoricRecords.length)],
+        ['---'],
+        null,
+        ['#', 'Data', 'Clasa', 'Ora'],
+        ...istoricRecords.map((r, i) => [
+          String(i + 1),
+          new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+          r.clasa,
+          r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+        ]),
+      ],
+      `istoric-${istoricPrenume}-${istoricNume}.csv`
+    );
+  }
+
+  function exportRangeCSV() {
+    // Grupăm înregistrările detaliate pe zile
+    const byDate = rangeRecords.reduce<Record<string, typeof rangeRecords>>((acc, r) => {
+      if (!acc[r.data]) acc[r.data] = [];
+      acc[r.data].push(r);
+      return acc;
+    }, {});
+    const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+    const rows: (string[] | null)[] = [
+      [`=== RAPORT INTERVAL — ${currentTeacher?.subject ?? ''} ===`],
+      ['Interval:', `${rangeFrom} → ${rangeTo}`],
+      ['Total înregistrări:', String(rangeRecords.length)],
+      ['Elevi unici:', String(rangeByStudent.length)],
+      ['---'],
+      null,
+      // ── Secțiunea 1: frecvență per elev ──
+      ['=== FRECVENȚĂ ELEVI ==='],
+      ['#', 'Prenume', 'Nume', 'Clasa', 'Zile prezent'],
+      ...rangeByStudent.map((s, i) => [
+        String(i + 1), s.prenume, s.nume, s.clasa, String(s.count),
+      ]),
+      null,
+      // ── Secțiunea 2: detaliu pe zile ──
+      ['=== DETALIU PE ZILE ==='],
+      ...sortedDates.flatMap(date => {
+        const dateLong = new Date(date + 'T12:00:00').toLocaleDateString('ro-RO', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        });
+        return [
+          null,
+          [`--- ${dateLong} (${byDate[date].length} prezenți) ---`],
+          ['#', 'Prenume', 'Nume', 'Clasa', 'Ora'],
+          ...byDate[date].map((r, i) => [
+            String(i + 1), r.prenume, r.nume, r.clasa,
+            r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+          ]),
+        ] as (string[] | null)[];
+      }),
+    ];
+
+    downloadCSV(rows, `raport-${rangeFrom}-${rangeTo}.csv`);
+  }
+
+  // ── Derived data ──────────────────────────────────────────────────────────
   const filtered = records.filter(r => {
     const matchesClasa = !filterClasa || r.clasa === filterClasa;
     const q = searchQuery.toLowerCase().trim();
@@ -168,6 +374,17 @@ export default function TeacherPage() {
     .map(cls => ({ clasa: cls, count: records.filter(r => r.clasa === cls).length }))
     .filter(s => s.count > 0);
   const maxCount = statsByClass.length > 0 ? Math.max(...statsByClass.map(s => s.count)) : 1;
+
+  const rangeByStudent = Object.values(
+    rangeRecords.reduce<Record<string, { prenume: string; nume: string; clasa: string; count: number }>>((acc, r) => {
+      const key = `${r.prenume}|${r.nume}`;
+      if (!acc[key]) acc[key] = { prenume: r.prenume, nume: r.nume, clasa: r.clasa, count: 0 };
+      acc[key].count++;
+      return acc;
+    }, {})
+  ).sort((a, b) => b.count - a.count);
+
+  const qrBaseUrl = `${siteUrl}/?materie=${encodeURIComponent(currentTeacher?.id ?? '')}`;
 
   // ── Login ──────────────────────────────────────────────────────────────────
   if (view === 'login') {
@@ -187,7 +404,7 @@ export default function TeacherPage() {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Parolă profesor"
+                placeholder="Parola dumneavoastră"
                 autoFocus
               />
             </div>
@@ -204,77 +421,143 @@ export default function TeacherPage() {
     <div className="teacher-page">
       <header className="teacher-header">
         <div className="header-content">
-          <h1>👩‍🏫 Panou Profesor</h1>
+          <div className="header-title">
+            <h1>👩‍🏫 {currentTeacher?.subject}</h1>
+            <span className="header-teacher-name">{currentTeacher?.name}</span>
+          </div>
           <div className="header-actions">
-            <button className="btn-secondary" onClick={() => setQrVisible(!qrVisible)}>
-              {qrVisible ? 'Ascunde QR' : '📱 QR Coduri'}
+            <button
+              className={`btn-lock${locked ? ' locked' : ''}`}
+              onClick={handleToggleLock}
+              disabled={lockLoading}
+              title={locked ? 'Deschide înregistrarea' : 'Blochează înregistrarea'}
+            >
+              {locked ? '🔒 Blocat' : '🔓 Activ'}
             </button>
-            <button className="btn-outline" onClick={() => setView('login')}>
-              Ieșire
+            <button className="btn-secondary" onClick={() => setQrVisible(v => !v)}>
+              {qrVisible ? 'Ascunde QR' : '📱 QR'}
             </button>
+            <button
+              className="btn-outline"
+              onClick={() => setDarkMode(d => !d)}
+              title="Mod întunecat"
+            >
+              {darkMode ? '☀' : '🌙'}
+            </button>
+            <button className="btn-outline" onClick={handleLogout}>Ieșire</button>
           </div>
         </div>
         <div className="dash-tabs">
-          <button
-            className={`dash-tab${dashTab === 'lista' ? ' active' : ''}`}
-            onClick={() => setDashTab('lista')}
-          >
-            Lista
-          </button>
-          <button
-            className={`dash-tab${dashTab === 'statistici' ? ' active' : ''}`}
-            onClick={() => setDashTab('statistici')}
-          >
-            Statistici
-          </button>
-          <button
-            className={`dash-tab${dashTab === 'istoric' ? ' active' : ''}`}
-            onClick={() => setDashTab('istoric')}
-          >
-            Istoric elev
-          </button>
+          {(['lista', 'statistici', 'raport', 'istoric'] as DashTab[]).map(tab => (
+            <button
+              key={tab}
+              className={`dash-tab${dashTab === tab ? ' active' : ''}`}
+              onClick={() => setDashTab(tab)}
+            >
+              {tab === 'lista' ? 'Listă'
+                : tab === 'statistici' ? 'Statistici'
+                : tab === 'raport' ? 'Raport interval'
+                : 'Istoric elev'}
+            </button>
+          ))}
         </div>
       </header>
 
       <main className="teacher-main">
+
+        {/* ── Edit Modal ── */}
+        {editingRecord && (
+          <div className="modal-overlay" onClick={() => setEditingRecord(null)}>
+            <div className="modal-box" onClick={e => e.stopPropagation()}>
+              <h2 className="modal-title">Editează înregistrarea</h2>
+              <form onSubmit={handleSaveEdit} className="form">
+                <div className="field">
+                  <label>Prenume</label>
+                  <input value={editPrenume} onChange={e => setEditPrenume(e.target.value)} disabled={editSaving} />
+                </div>
+                <div className="field">
+                  <label>Nume de familie</label>
+                  <input value={editNume} onChange={e => setEditNume(e.target.value)} disabled={editSaving} />
+                </div>
+                <div className="field">
+                  <label>Clasa</label>
+                  <select value={editClasa} onChange={e => setEditClasa(e.target.value)} disabled={editSaving}>
+                    <option value="">— Alege clasa —</option>
+                    <optgroup label="Clasele V–IX">
+                      {ALL_CLASSES.filter(c => ['V','VI','VII','VIII','IX'].some(cls => c.startsWith(cls+'-'))).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Clasele X–XII">
+                      {ALL_CLASSES.filter(c => ['X','XI','XII'].some(cls => c.startsWith(cls+'-'))).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="btn-cancel-sm"
+                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                    onClick={() => setEditingRecord(null)}
+                  >
+                    Anulează
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    style={{ width: 'auto', padding: '10px 24px' }}
+                    disabled={editSaving}
+                  >
+                    {editSaving ? 'Se salvează...' : 'Salvează'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Lock Banner ── */}
+        {locked && (
+          <div className="lock-banner">
+            🔒 Înregistrarea prezentei este blocată. Elevii nu pot marca prezența momentan.
+          </div>
+        )}
 
         {/* ── QR Panel ── */}
         {qrVisible && (
           <div className="qr-panel">
             <div className="qr-inner">
               <div className="qr-mode-toggle">
-                <button
-                  className={`qr-mode-btn${qrMode === 'general' ? ' active' : ''}`}
-                  onClick={() => setQrMode('general')}
-                >
+                <button className={`qr-mode-btn${qrMode === 'general' ? ' active' : ''}`} onClick={() => setQrMode('general')}>
                   QR General
                 </button>
-                <button
-                  className={`qr-mode-btn${qrMode === 'perClasa' ? ' active' : ''}`}
-                  onClick={() => setQrMode('perClasa')}
-                >
+                <button className={`qr-mode-btn${qrMode === 'perClasa' ? ' active' : ''}`} onClick={() => setQrMode('perClasa')}>
                   QR per Clasă
                 </button>
               </div>
 
               {qrMode === 'general' ? (
                 <>
-                  <h2>QR Code — Prezență</h2>
-                  <p className="qr-sub">Elevii scanează acest cod pentru a marca prezența</p>
+                  <h2>QR — {currentTeacher?.subject}</h2>
+                  <p className="qr-sub">
+                    Elevii scanează pentru a marca prezența la <strong>{currentTeacher?.subject}</strong>
+                  </p>
                   <div className="qr-box">
-                    <QRCodeSVG value={siteUrl} size={220} level="H" />
+                    <QRCodeSVG value={qrBaseUrl} size={220} level="H" />
                   </div>
-                  <p className="qr-url">{siteUrl}</p>
+                  <p className="qr-url">{qrBaseUrl}</p>
                 </>
               ) : (
                 <>
-                  <h2>QR Coduri per Clasă</h2>
-                  <p className="qr-sub">Fiecare cod pre-completează clasa elevului automat</p>
+                  <h2>QR per Clasă — {currentTeacher?.subject}</h2>
+                  <p className="qr-sub">Fiecare cod pre-completează clasa automat</p>
                   <div className="qr-grid">
                     {ALL_CLASSES.map(cls => (
                       <div className="qr-class-item" key={cls}>
                         <QRCodeSVG
-                          value={`${siteUrl}/?clasa=${encodeURIComponent(cls)}`}
+                          value={`${qrBaseUrl}&clasa=${encodeURIComponent(cls)}`}
                           size={110}
                           level="M"
                         />
@@ -303,32 +586,19 @@ export default function TeacherPage() {
               <div className="control-row">
                 <div className="field">
                   <label htmlFor="date">Data</label>
-                  <input
-                    id="date"
-                    type="date"
-                    value={selectedDate}
-                    onChange={e => setSelectedDate(e.target.value)}
-                  />
+                  <input id="date" type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
                 </div>
                 <div className="field">
                   <label htmlFor="filter-clasa">Filtrează clasa</label>
-                  <select
-                    id="filter-clasa"
-                    value={filterClasa}
-                    onChange={e => setFilterClasa(e.target.value)}
-                  >
+                  <select id="filter-clasa" value={filterClasa} onChange={e => setFilterClasa(e.target.value)}>
                     <option value="">Toate clasele</option>
                     <optgroup label="Clasele V–IX">
-                      {ALL_CLASSES.filter(c =>
-                        ['V', 'VI', 'VII', 'VIII', 'IX'].some(cls => c.startsWith(cls + '-'))
-                      ).map(c => (
+                      {ALL_CLASSES.filter(c => ['V','VI','VII','VIII','IX'].some(cls => c.startsWith(cls+'-'))).map(c => (
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </optgroup>
                     <optgroup label="Clasele X–XII">
-                      {ALL_CLASSES.filter(c =>
-                        ['X', 'XI', 'XII'].some(cls => c.startsWith(cls + '-'))
-                      ).map(c => (
+                      {ALL_CLASSES.filter(c => ['X','XI','XII'].some(cls => c.startsWith(cls+'-'))).map(c => (
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </optgroup>
@@ -360,12 +630,8 @@ export default function TeacherPage() {
                 </span>
                 {filtered.length > 0 && (
                   <>
-                    <button className="btn-action" onClick={exportCSV} title="Exportă CSV">
-                      ⬇ CSV
-                    </button>
-                    <button className="btn-action no-print" onClick={() => window.print()} title="Printează lista">
-                      🖨 Print
-                    </button>
+                    <button className="btn-action" onClick={exportCSV}>⬇ CSV</button>
+                    <button className="btn-action no-print" onClick={() => window.print()}>🖨 Print</button>
                   </>
                 )}
               </div>
@@ -382,7 +648,7 @@ export default function TeacherPage() {
               <div className="attendance-table-wrap" id="print-area">
                 <div className="print-header">
                   <strong>
-                    Prezența —{' '}
+                    Prezența — {currentTeacher?.subject} —{' '}
                     {new Date(selectedDate + 'T12:00:00').toLocaleDateString('ro-RO', {
                       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
                     })}
@@ -413,14 +679,17 @@ export default function TeacherPage() {
                         </td>
                         <td className="td-ip no-print">{r.ip ?? '—'}</td>
                         <td className="no-print">
-                          {deleteConfirm === r.id ? (
-                            <span className="delete-confirm">
-                              <button className="btn-danger-sm" onClick={() => handleDelete(r.id)}>Da</button>
-                              <button className="btn-cancel-sm" onClick={() => setDeleteConfirm(null)}>Nu</button>
-                            </span>
-                          ) : (
-                            <button className="btn-delete" onClick={() => setDeleteConfirm(r.id)} title="Șterge">✕</button>
-                          )}
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button className="btn-edit" onClick={() => startEdit(r)} title="Editează">✎</button>
+                            {deleteConfirm === r.id ? (
+                              <span className="delete-confirm">
+                                <button className="btn-danger-sm" onClick={() => handleDelete(r.id)}>Da</button>
+                                <button className="btn-cancel-sm" onClick={() => setDeleteConfirm(null)}>Nu</button>
+                              </span>
+                            ) : (
+                              <button className="btn-delete" onClick={() => setDeleteConfirm(r.id)} title="Șterge">✕</button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -438,12 +707,7 @@ export default function TeacherPage() {
               <div className="control-row">
                 <div className="field">
                   <label htmlFor="date-stats">Data</label>
-                  <input
-                    id="date-stats"
-                    type="date"
-                    value={selectedDate}
-                    onChange={e => setSelectedDate(e.target.value)}
-                  />
+                  <input id="date-stats" type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
                 </div>
               </div>
             </div>
@@ -473,22 +737,89 @@ export default function TeacherPage() {
               <div className="empty-state">Nicio prezență înregistrată în această zi.</div>
             ) : (
               <div className="bar-chart-panel">
-                <h3>Prezenți per clasă</h3>
+                <h3>Prezenți per clasă — {currentTeacher?.subject}</h3>
                 <div className="bar-chart">
                   {statsByClass.map(s => (
                     <div className="bar-item" key={s.clasa}>
                       <div className="bar-label">{s.clasa}</div>
                       <div className="bar-track">
-                        <div
-                          className="bar-fill"
-                          style={{ width: `${(s.count / maxCount) * 100}%` }}
-                        />
+                        <div className="bar-fill" style={{ width: `${(s.count / maxCount) * 100}%` }} />
                         <span className="bar-value">{s.count}</span>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+            )}
+          </>
+        )}
+
+        {/* ══════════════ TAB: RAPORT INTERVAL ══════════════ */}
+        {dashTab === 'raport' && (
+          <>
+            <div className="controls">
+              <form onSubmit={handleRangeSearch}>
+                <div className="control-row">
+                  <div className="field">
+                    <label htmlFor="range-from">De la</label>
+                    <input id="range-from" type="date" value={rangeFrom} onChange={e => setRangeFrom(e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="range-to">Până la</label>
+                    <input id="range-to" type="date" value={rangeTo} onChange={e => setRangeTo(e.target.value)} />
+                  </div>
+                  <div className="field field-btn">
+                    <label>&nbsp;</label>
+                    <button type="submit" className="btn-search" disabled={rangeLoading}>
+                      {rangeLoading ? 'Se caută...' : 'Caută'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            {rangeSearched && !rangeLoading && (
+              rangeRecords.length === 0 ? (
+                <div className="empty-state">Nicio prezență în intervalul selectat.</div>
+              ) : (
+                <>
+                  <div className="stats-bar">
+                    <span className="stat">
+                      <strong>{rangeRecords.length}</strong> înregistrări,{' '}
+                      <strong>{rangeByStudent.length}</strong> elevi unici
+                    </span>
+                    <button className="btn-action" onClick={exportRangeCSV}>⬇ CSV</button>
+                  </div>
+                  <div className="attendance-table-wrap">
+                    <div className="istoric-result-header">
+                      <strong>Frecvență — {currentTeacher?.subject}</strong>
+                      <span className="istoric-count">{rangeFrom} → {rangeTo}</span>
+                    </div>
+                    <table className="attendance-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Prenume</th>
+                          <th>Nume</th>
+                          <th>Clasa</th>
+                          <th>Zile prezent</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rangeByStudent.map((s, i) => (
+                          <tr key={`${s.prenume}|${s.nume}`}>
+                            <td className="td-nr">{i + 1}</td>
+                            <td>{s.prenume}</td>
+                            <td>{s.nume}</td>
+                            <td><span className="badge">{s.clasa}</span></td>
+                            <td><strong style={{ color: 'var(--blue)' }}>{s.count}</strong></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )
             )}
           </>
         )}
@@ -541,7 +872,10 @@ export default function TeacherPage() {
                 <div className="attendance-table-wrap">
                   <div className="istoric-result-header">
                     <strong>{istoricPrenume} {istoricNume}</strong>
-                    <span className="istoric-count">{istoricRecords.length} zile prezent</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span className="istoric-count">{istoricRecords.length} zile prezent</span>
+                      <button className="btn-action" onClick={exportIstoricCSV}>⬇ CSV</button>
+                    </div>
                   </div>
                   <table className="attendance-table">
                     <thead>

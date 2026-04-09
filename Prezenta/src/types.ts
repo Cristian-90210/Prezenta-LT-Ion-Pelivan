@@ -6,4 +6,5 @@ export interface AttendanceRecord {
   timestamp: Date;
   data: string;
   ip?: string;
+  materie?: string;
 }
