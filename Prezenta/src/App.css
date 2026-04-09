@@ -695,6 +695,68 @@ html, body, #root {
 }
 .qr-class-label { font-size: 0.82rem; font-weight: 700; color: var(--blue); }
 
+.qr-class-item--clickable {
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.qr-class-item--clickable:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 16px rgba(37,99,235,0.18);
+  border-color: var(--blue);
+}
+
+/* ── QR Zoom Modal ── */
+.qr-zoom-box {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 48px rgba(0,0,0,0.3);
+  width: 100%;
+  max-width: 400px;
+  overflow: hidden;
+}
+.qr-zoom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.qr-zoom-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.qr-zoom-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.1s, background 0.1s;
+}
+.qr-zoom-close:hover { color: var(--red); background: var(--red-light); }
+.qr-zoom-body {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.qr-zoom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  gap: 8px;
+}
+.qr-zoom-counter {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 /* ── Clasa locked (din QR) ── */
 .clasa-locked {
   display: flex;

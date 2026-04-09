@@ -38,6 +38,7 @@ export default function TeacherPage() {
   // ── QR ────────────────────────────────────────────────────────────────────
   const [qrVisible, setQrVisible] = useState(false);
   const [qrMode, setQrMode] = useState<'general' | 'perClasa'>('general');
+  const [qrZoom, setQrZoom] = useState<string | null>(null); // clasa selectată pentru zoom
 
   // ── Lock ──────────────────────────────────────────────────────────────────
   const [locked, setLocked] = useState(false);
@@ -518,6 +519,55 @@ export default function TeacherPage() {
           </div>
         )}
 
+        {/* ── QR Zoom Modal ── */}
+        {qrZoom && (
+          <div className="modal-overlay" onClick={() => setQrZoom(null)}>
+            <div className="qr-zoom-box" onClick={e => e.stopPropagation()}>
+              <div className="qr-zoom-header">
+                <span className="qr-zoom-title">Clasa {qrZoom} — {currentTeacher?.subject}</span>
+                <button className="qr-zoom-close" onClick={() => setQrZoom(null)}>✕</button>
+              </div>
+              <div className="qr-zoom-body">
+                <div className="qr-box">
+                  <QRCodeSVG
+                    value={`${qrBaseUrl}&clasa=${encodeURIComponent(qrZoom)}`}
+                    size={280}
+                    level="H"
+                  />
+                </div>
+                <p className="qr-url" style={{ marginTop: 12 }}>
+                  {`${qrBaseUrl}&clasa=${encodeURIComponent(qrZoom)}`}
+                </p>
+              </div>
+              <div className="qr-zoom-nav">
+                <button
+                  className="btn-action"
+                  onClick={() => {
+                    const idx = ALL_CLASSES.indexOf(qrZoom);
+                    if (idx > 0) setQrZoom(ALL_CLASSES[idx - 1]);
+                  }}
+                  disabled={ALL_CLASSES.indexOf(qrZoom) === 0}
+                >
+                  ← Anterior
+                </button>
+                <span className="qr-zoom-counter">
+                  {ALL_CLASSES.indexOf(qrZoom) + 1} / {ALL_CLASSES.length}
+                </span>
+                <button
+                  className="btn-action"
+                  onClick={() => {
+                    const idx = ALL_CLASSES.indexOf(qrZoom);
+                    if (idx < ALL_CLASSES.length - 1) setQrZoom(ALL_CLASSES[idx + 1]);
+                  }}
+                  disabled={ALL_CLASSES.indexOf(qrZoom) === ALL_CLASSES.length - 1}
+                >
+                  Următor →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Lock Banner ── */}
         {locked && (
           <div className="lock-banner">
@@ -555,7 +605,12 @@ export default function TeacherPage() {
                   <p className="qr-sub">Fiecare cod pre-completează clasa automat</p>
                   <div className="qr-grid">
                     {ALL_CLASSES.map(cls => (
-                      <div className="qr-class-item" key={cls}>
+                      <div
+                        className="qr-class-item qr-class-item--clickable"
+                        key={cls}
+                        onClick={() => setQrZoom(cls)}
+                        title="Click pentru mărire"
+                      >
                         <QRCodeSVG
                           value={`${qrBaseUrl}&clasa=${encodeURIComponent(cls)}`}
                           size={110}
