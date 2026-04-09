@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { useSearchParams } from 'react-router-dom';
+import { collection, addDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 type Step = 'form' | 'success' | 'error';
 
 export default function StudentPage() {
+  const [searchParams] = useSearchParams();
+  const clasaFromUrl = searchParams.get('clasa') ?? '';
+
   const [prenume, setPrenume] = useState('');
   const [nume, setNume] = useState('');
-  const [clasa, setClasa] = useState('');
+  const [clasa, setClasa] = useState(clasaFromUrl);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<Step>('form');
   const [validationError, setValidationError] = useState('');
@@ -29,17 +33,36 @@ export default function StudentPage() {
 
     setLoading(true);
 
-    // Arată succes imediat — nu mai așteaptă confirmarea Firebase
+    // Verificare anti-duplicat
+    try {
+      const dupQuery = query(
+        collection(db, 'prezenta'),
+        where('prenume', '==', prenumeTrim),
+        where('nume', '==', numeTrim),
+        where('clasa', '==', clasaTrim),
+        where('data', '==', today)
+      );
+      const dupSnapshot = await getDocs(dupQuery);
+      if (!dupSnapshot.empty) {
+        setValidationError('Prezența ta a fost deja înregistrată astăzi!');
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // Dacă verificarea eșuează, continuăm oricum
+    }
+
+    // Afișăm succes după ce verificarea anti-duplicat a trecut
     setStep('success');
 
-    // Obține IP-ul și salvează în fundal
+    // Obținem IP-ul și salvăm în fundal
     let ip = 'necunoscut';
     try {
       const res = await fetch('https://api.ipify.org?format=json');
       const json = await res.json();
       ip = json.ip ?? 'necunoscut';
     } catch {
-      // IP rămâne 'necunoscut' dacă fetch-ul eșuează
+      // IP rămâne 'necunoscut'
     }
 
     try {
@@ -129,36 +152,46 @@ export default function StudentPage() {
             />
           </div>
 
-          <div className="field">
-            <label htmlFor="clasa">Clasa</label>
-            <select
-              id="clasa"
-              value={clasa}
-              onChange={e => setClasa(e.target.value)}
-              disabled={loading}
-            >
-              <option value="">— Alege clasa —</option>
-              <optgroup label="Clasele V–IX">
-                {['V','VI','VII','VIII','IX'].flatMap(cls =>
-                  ['A','B','C'].map(lit => (
-                    <option key={`${cls}-${lit}`} value={`${cls}-${lit}`}>{cls}-{lit}</option>
-                  ))
-                )}
-              </optgroup>
-              <optgroup label="Clasele X–XII">
-                {['X','XI','XII'].flatMap(cls =>
-                  ['REAL','UMAN'].map(profil => (
-                    <option key={`${cls}-${profil}`} value={`${cls}-${profil}`}>{cls}-{profil}</option>
-                  ))
-                )}
-              </optgroup>
-            </select>
-          </div>
+          {clasaFromUrl ? (
+            <div className="field">
+              <label>Clasa</label>
+              <div className="clasa-locked">
+                <span className="badge badge-lg">{clasaFromUrl}</span>
+                <span className="clasa-locked-text">pre-completată din QR</span>
+              </div>
+            </div>
+          ) : (
+            <div className="field">
+              <label htmlFor="clasa">Clasa</label>
+              <select
+                id="clasa"
+                value={clasa}
+                onChange={e => setClasa(e.target.value)}
+                disabled={loading}
+              >
+                <option value="">— Alege clasa —</option>
+                <optgroup label="Clasele V–IX">
+                  {['V', 'VI', 'VII', 'VIII', 'IX'].flatMap(cls =>
+                    ['A', 'B', 'C'].map(lit => (
+                      <option key={`${cls}-${lit}`} value={`${cls}-${lit}`}>{cls}-{lit}</option>
+                    ))
+                  )}
+                </optgroup>
+                <optgroup label="Clasele X–XII">
+                  {['X', 'XI', 'XII'].flatMap(cls =>
+                    ['REAL', 'UMAN'].map(profil => (
+                      <option key={`${cls}-${profil}`} value={`${cls}-${profil}`}>{cls}-{profil}</option>
+                    ))
+                  )}
+                </optgroup>
+              </select>
+            </div>
+          )}
 
           {validationError && <p className="error-msg">{validationError}</p>}
 
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Se înregistrează...' : 'Marchează Prezența'}
+            {loading ? 'Se verifică...' : 'Marchează Prezența'}
           </button>
         </form>
       </div>
