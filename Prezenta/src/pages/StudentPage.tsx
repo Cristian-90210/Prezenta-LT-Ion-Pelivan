@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, addDoc, Timestamp, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
+import { Timestamp, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { TEACHERS } from '../teachers';
 
@@ -52,6 +52,17 @@ export default function StudentPage() {
     return () => unsubscribe();
   }, [teacher?.id]);
 
+  // ID determinist: același elev + aceeași materie + aceeași zi → același document
+  function buildDocId(prenume: string, nume: string, clasa: string, data: string, materieId: string): string {
+    const normalize = (s: string) =>
+      s.toLowerCase()
+       .normalize('NFD')
+       .replace(/[\u0300-\u036f]/g, '') // elimină diacriticele
+       .replace(/[^a-z0-9._-]/g, '_');
+    const suffix = materieId ? `|${materieId}` : '';
+    return `${normalize(prenume)}|${normalize(nume)}|${clasa.toLowerCase()}|${data}${suffix}`;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setValidationError('');
@@ -72,23 +83,20 @@ export default function StudentPage() {
 
     setLoading(true);
 
-    // Anti-duplicate check
+    // Verificare anti-duplicat prin ID determinist (nu depinde de index Firestore)
+    const docId = buildDocId(prenumeTrim, numeTrim, clasaTrim, today, teacher?.id ?? '');
     try {
-      const dupQuery = query(
-        collection(db, 'prezenta'),
-        where('prenume', '==', prenumeTrim),
-        where('nume', '==', numeTrim),
-        where('clasa', '==', clasaTrim),
-        where('data', '==', today)
-      );
-      const dupSnapshot = await getDocs(dupQuery);
-      if (!dupSnapshot.empty) {
+      const existing = await getDoc(doc(db, 'prezenta', docId));
+      if (existing.exists()) {
         setValidationError('Prezența ta a fost deja înregistrată astăzi!');
         setLoading(false);
         return;
       }
-    } catch {
-      // dacă verificarea eșuează, continuăm
+    } catch (err) {
+      console.error('Eroare la verificare duplicat:', err);
+      setValidationError('Eroare de conexiune. Încearcă din nou.');
+      setLoading(false);
+      return;
     }
 
     setStep('success');
@@ -101,7 +109,7 @@ export default function StudentPage() {
     } catch {}
 
     try {
-      await addDoc(collection(db, 'prezenta'), {
+      await setDoc(doc(db, 'prezenta', docId), {
         prenume: prenumeTrim,
         nume: numeTrim,
         clasa: clasaTrim,
