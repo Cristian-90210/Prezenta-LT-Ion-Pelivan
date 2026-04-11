@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { signOut } from 'firebase/auth';
+import { signOut, sendEmailVerification } from 'firebase/auth';
 import {
   collection, query, where, getDocs, getDoc,
   doc, setDoc, Timestamp, onSnapshot,
@@ -8,6 +8,7 @@ import {
 import { auth, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface StudentProfile {
   prenume: string;
@@ -52,12 +53,16 @@ export default function StudentDashboardPage() {
   const [records, setRecords]               = useState<AttRec[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(true);
 
-  const [regState, setRegState]   = useState<RegState>('idle');
-  const [dashTab, setDashTab]     = useState<StudentTab>(materieId ? 'scan' : 'scan');
+  const [regState, setRegState]       = useState<RegState>('idle');
+  const [dashTab, setDashTab]         = useState<StudentTab>('scan');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const scannerRef = useRef<any>(null);
 
+  const [verifSent, setVerifSent]     = useState(false);
+  const [verifLoading, setVerifLoading] = useState(false);
+
+  const isOnline = useOnlineStatus();
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
   useEffect(() => {
@@ -124,6 +129,16 @@ export default function StudentDashboardPage() {
 
     return () => unsub();
   }, [teacher?.id, profile, clasaFromQR, today]);
+
+  async function handleResendVerification() {
+    if (!user || verifLoading) return;
+    setVerifLoading(true);
+    try {
+      await sendEmailVerification(user);
+      setVerifSent(true);
+    } catch {}
+    setVerifLoading(false);
+  }
 
   async function handleRegister() {
     if (!profile || !teacher || !user) return;
@@ -293,6 +308,7 @@ export default function StudentDashboardPage() {
       <header className="teacher-header">
         <div className="header-content">
           <button className="btn-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+          {!isOnline && <span className="offline-badge">Offline</span>}
 
           <div className="header-title">
             <span className="school-icon-sm">🎓</span>
@@ -363,6 +379,27 @@ export default function StudentDashboardPage() {
           ))}
         </div>
       </header>
+
+      {/* ── Banner email neverificat ── */}
+      {user && !user.emailVerified && (
+        <div className="alert-banner alert-banner--warning">
+          <span>📧 Verifică-ți adresa de email <strong>{user.email}</strong>. Caută emailul de la Firebase.</span>
+          <button
+            className="alert-banner-btn"
+            onClick={handleResendVerification}
+            disabled={verifLoading || verifSent}
+          >
+            {verifSent ? '✓ Trimis!' : verifLoading ? 'Se trimite...' : 'Retrimite'}
+          </button>
+        </div>
+      )}
+
+      {/* ── Banner offline ── */}
+      {!isOnline && (
+        <div className="alert-banner alert-banner--offline">
+          <span>📵 Ești offline. Prezențele se salvează local și se sincronizează automat când revine conexiunea.</span>
+        </div>
+      )}
 
       {/* ── Conținut principal ── */}
       <main className="teacher-main" style={{ paddingTop: 24 }}>

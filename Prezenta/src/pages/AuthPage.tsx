@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useConfig } from '../hooks/useConfig';
@@ -75,6 +75,8 @@ export default function AuthPage() {
         clasa,
         email: email.trim().toLowerCase(),
       });
+      // Trimite email de verificare — ignorăm eroarea dacă eșuează (cont creat oricum)
+      sendEmailVerification(cred.user).catch(() => {});
     } catch (err: any) {
       setError(authErrorMsg(err.code));
     } finally {

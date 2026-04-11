@@ -1,10 +1,19 @@
-import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { useState, useEffect, useCallback } from 'react';
+import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { db, auth } from '../firebase';
 import { TEACHERS, type Teacher } from '../teachers';
 import { useConfig, DEFAULT_CLASSES } from '../hooks/useConfig';
 
-type AdminTab = 'profesori' | 'clase' | 'setari';
+type AdminTab = 'profesori' | 'clase' | 'elevi' | 'setari';
+
+interface StudentRecord {
+  uid: string;
+  prenume: string;
+  nume: string;
+  clasa: string;
+  email: string;
+}
 
 function normalizeId(s: string): string {
   return s
@@ -39,6 +48,14 @@ export default function AdminPage() {
   // Change admin password
   const [newAdminPass, setNewAdminPass] = useState('');
   const [passMsg, setPassMsg] = useState('');
+
+  // Students tab
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentsError, setStudentsError] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [resetMsg, setResetMsg] = useState<Record<string, string>>({});
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // Dark mode
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
@@ -124,6 +141,49 @@ export default function AdminPage() {
     await saveClasses(classes.filter(c => c !== cls));
   }
 
+  const loadStudents = useCallback(async () => {
+    setStudentsLoading(true);
+    setStudentsError('');
+    try {
+      const snap = await getDocs(collection(db, 'students'));
+      const data: StudentRecord[] = snap.docs.map(d => ({
+        uid: d.id,
+        prenume: d.data().prenume ?? '',
+        nume:    d.data().nume    ?? '',
+        clasa:   d.data().clasa   ?? '',
+        email:   d.data().email   ?? '',
+      })).sort((a, b) => a.nume.localeCompare(b.nume));
+      setStudents(data);
+    } catch {
+      setStudentsError('Nu s-au putut încărca elevii. Verificați regulile Firestore (allow read: if true pentru /students/{uid}).');
+    }
+    setStudentsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'elevi' && loggedIn) loadStudents();
+  }, [tab, loggedIn, loadStudents]);
+
+  async function handleResetPassword(student: StudentRecord) {
+    try {
+      await sendPasswordResetEmail(auth, student.email);
+      setResetMsg(m => ({ ...m, [student.uid]: '✓ Email trimis!' }));
+    } catch {
+      setResetMsg(m => ({ ...m, [student.uid]: 'Eroare la trimitere.' }));
+    }
+    setTimeout(() => setResetMsg(m => { const n = { ...m }; delete n[student.uid]; return n; }), 3000);
+  }
+
+  async function handleDeleteStudent(uid: string) {
+    try {
+      await deleteDoc(doc(db, 'students', uid));
+      setStudents(s => s.filter(st => st.uid !== uid));
+      setDeleteConfirm(null);
+    } catch {
+      alert('Eroare la ștergere.');
+    }
+  }
+
   async function handleChangeAdminPass(e: React.FormEvent) {
     e.preventDefault();
     const p = newAdminPass.trim();
@@ -198,13 +258,18 @@ export default function AdminPage() {
           </div>
         </div>
         <div className="dash-tabs">
-          {(['profesori', 'clase', 'setari'] as AdminTab[]).map(t => (
+          {([
+            ['profesori', 'Profesori'],
+            ['clase',     'Clase'],
+            ['elevi',     'Elevi'],
+            ['setari',    'Setări'],
+          ] as [AdminTab, string][]).map(([id, label]) => (
             <button
-              key={t}
-              className={`dash-tab${tab === t ? ' active' : ''}`}
-              onClick={() => setTab(t)}
+              key={id}
+              className={`dash-tab${tab === id ? ' active' : ''}`}
+              onClick={() => setTab(id)}
             >
-              {t === 'profesori' ? 'Profesori' : t === 'clase' ? 'Clase' : 'Setări'}
+              {label}
             </button>
           ))}
         </div>
@@ -375,6 +440,153 @@ export default function AdminPage() {
                 ))}
               </div>
             </div>
+          </>
+        )}
+
+        {/* ══ Tab: Elevi ══ */}
+        {tab === 'elevi' && (
+          <>
+            {/* Search */}
+            <div className="controls">
+              <div className="control-row" style={{ alignItems: 'flex-end' }}>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>Caută elev (nume, clasă sau email)</label>
+                  <input
+                    type="text"
+                    value={studentSearch}
+                    onChange={e => setStudentSearch(e.target.value)}
+                    placeholder="ex: Popescu sau X-A"
+                  />
+                </div>
+                <div className="field field-btn">
+                  <label>&nbsp;</label>
+                  <button className="btn-search" style={{ background: '#7c3aed' }} onClick={loadStudents}>
+                    ↻ Reîncarcă
+                  </button>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 8 }}>
+                ⚠️ Dacă apare eroare, adaugă în Firestore Rules:{' '}
+                <code style={{ background: 'var(--gray-100)', padding: '1px 5px', borderRadius: 3 }}>
+                  match /students/&#123;uid&#125; &#123; allow read: if true; &#125;
+                </code>
+              </p>
+            </div>
+
+            {studentsLoading && (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+                Se încarcă elevii...
+              </div>
+            )}
+
+            {studentsError && (
+              <div className="firebase-error">
+                <strong>Eroare</strong>
+                <p>{studentsError}</p>
+              </div>
+            )}
+
+            {!studentsLoading && !studentsError && (
+              <div className="attendance-table-wrap">
+                <div className="istoric-result-header">
+                  <strong>
+                    {(() => {
+                      const filtered = students.filter(s => {
+                        const q = studentSearch.toLowerCase();
+                        return !q || s.prenume.toLowerCase().includes(q) ||
+                          s.nume.toLowerCase().includes(q) ||
+                          s.clasa.toLowerCase().includes(q) ||
+                          s.email.toLowerCase().includes(q);
+                      });
+                      return `${filtered.length} elev${filtered.length !== 1 ? 'i' : ''} găsit${filtered.length !== 1 ? 'i' : ''}`;
+                    })()}
+                  </strong>
+                </div>
+                <table className="attendance-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Nume</th>
+                      <th>Clasă</th>
+                      <th>Email</th>
+                      <th>Acțiuni</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students
+                      .filter(s => {
+                        const q = studentSearch.toLowerCase();
+                        return !q || s.prenume.toLowerCase().includes(q) ||
+                          s.nume.toLowerCase().includes(q) ||
+                          s.clasa.toLowerCase().includes(q) ||
+                          s.email.toLowerCase().includes(q);
+                      })
+                      .map((s, i) => (
+                        <tr key={s.uid}>
+                          <td className="td-nr">{i + 1}</td>
+                          <td><strong>{s.prenume} {s.nume}</strong></td>
+                          <td><span className="badge">{s.clasa}</span></td>
+                          <td className="td-ip">{s.email}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                              {resetMsg[s.uid] ? (
+                                <span style={{
+                                  fontSize: '0.78rem', fontWeight: 700,
+                                  color: resetMsg[s.uid].startsWith('✓') ? 'var(--green)' : 'var(--rose)',
+                                }}>
+                                  {resetMsg[s.uid]}
+                                </span>
+                              ) : (
+                                <button
+                                  className="btn-action"
+                                  style={{ fontSize: '0.75rem', padding: '5px 10px' }}
+                                  onClick={() => handleResetPassword(s)}
+                                  title="Trimite email de resetare parolă"
+                                >
+                                  🔑 Reset parolă
+                                </button>
+                              )}
+                              {deleteConfirm === s.uid ? (
+                                <>
+                                  <button
+                                    className="btn-delete"
+                                    onClick={() => handleDeleteStudent(s.uid)}
+                                    title="Confirmă ștergerea"
+                                  >
+                                    ✓ Confirm
+                                  </button>
+                                  <button
+                                    className="btn-action"
+                                    style={{ fontSize: '0.75rem', padding: '5px 8px' }}
+                                    onClick={() => setDeleteConfirm(null)}
+                                  >
+                                    Anulează
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  className="btn-delete"
+                                  onClick={() => setDeleteConfirm(s.uid)}
+                                  title="Șterge cont elev"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    {students.length === 0 && !studentsLoading && (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
+                          Niciun elev înregistrat încă.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
 
