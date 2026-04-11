@@ -4,6 +4,8 @@ import {
   getDocs, updateDoc, setDoc,
 } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
 import type { AttendanceRecord } from '../types';
 import { useConfig } from '../hooks/useConfig';
@@ -358,6 +360,179 @@ export default function TeacherPage() {
     ];
 
     downloadCSV(rows, `raport-${rangeFrom}-${rangeTo}.csv`);
+  }
+
+  // ── PDF helpers ───────────────────────────────────────────────────────────
+  const PDF_INDIGO: [number, number, number] = [67, 56, 202];
+  const PDF_INDIGO_LIGHT: [number, number, number] = [237, 233, 254];
+
+  function pdfHeader(doc: jsPDF, subtitle: string) {
+    // Banner gradient simulat cu un dreptunghi
+    doc.setFillColor(...PDF_INDIGO);
+    doc.rect(0, 0, 210, 36, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.text('Liceul Teoretic Ion Pelivan', 14, 13);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Ora de ${currentTeacher?.subject ?? ''}  ·  Prof. ${currentTeacher?.name ?? ''}`, 14, 22);
+    doc.text(subtitle, 14, 30);
+    doc.setTextColor(0, 0, 0);
+  }
+
+  function pdfFooter(doc: jsPDF) {
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(160, 160, 160);
+      doc.text(
+        `Generat la ${new Date().toLocaleString('ro-RO')}   |   Pagina ${i} din ${pages}`,
+        14, doc.internal.pageSize.height - 8,
+      );
+    }
+  }
+
+  // PDF – Lista zilnică
+  function exportPDF() {
+    const dateLong = new Date(selectedDate + 'T12:00:00').toLocaleDateString('ro-RO', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const doc = new jsPDF();
+    pdfHeader(doc, `Prezență — ${dateLong}`);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(`Total prezenți: ${filtered.length}${filterClasa ? `  ·  Clasa: ${filterClasa}` : ''}`, 14, 46);
+
+    autoTable(doc, {
+      startY: 52,
+      head: [['#', 'Prenume', 'Nume', 'Clasa', 'Ora înregistrării']],
+      body: filtered.map((r, i) => [
+        i + 1,
+        r.prenume,
+        r.nume,
+        r.clasa,
+        r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+      ]),
+      headStyles: { fillColor: PDF_INDIGO, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+      alternateRowStyles: { fillColor: PDF_INDIGO_LIGHT },
+      styles: { font: 'helvetica', fontSize: 10, cellPadding: 4 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: 'center' },
+        3: { cellWidth: 28, halign: 'center' },
+        4: { cellWidth: 38, halign: 'center' },
+      },
+    });
+
+    pdfFooter(doc);
+    doc.save(`prezenta-${selectedDate}${filterClasa ? '-' + filterClasa : ''}.pdf`);
+  }
+
+  // PDF – Raport interval
+  function exportRangePDF() {
+    const doc = new jsPDF();
+    pdfHeader(doc, `Raport interval: ${rangeFrom} → ${rangeTo}`);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(
+      `${rangeRecords.length} înregistrări  ·  ${rangeByStudent.length} elevi unici`,
+      14, 46,
+    );
+
+    // Secțiunea 1 — frecvență per elev
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...PDF_INDIGO);
+    doc.text('Frecvență elevi', 14, 55);
+
+    autoTable(doc, {
+      startY: 59,
+      head: [['#', 'Prenume', 'Nume', 'Clasa', 'Zile prezent']],
+      body: rangeByStudent.map((s, i) => [i + 1, s.prenume, s.nume, s.clasa, s.count]),
+      headStyles: { fillColor: PDF_INDIGO, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+      alternateRowStyles: { fillColor: PDF_INDIGO_LIGHT },
+      styles: { font: 'helvetica', fontSize: 10, cellPadding: 4 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: 'center' },
+        3: { cellWidth: 28, halign: 'center' },
+        4: { cellWidth: 30, halign: 'center' },
+      },
+    });
+
+    // Secțiunea 2 — detaliu cronologic
+    const afterTable = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...PDF_INDIGO);
+    doc.text('Detaliu înregistrări', 14, afterTable);
+
+    autoTable(doc, {
+      startY: afterTable + 4,
+      head: [['#', 'Prenume', 'Nume', 'Clasa', 'Data', 'Ora']],
+      body: [...rangeRecords]
+        .sort((a, b) => b.data.localeCompare(a.data))
+        .map((r, i) => [
+          i + 1, r.prenume, r.nume, r.clasa,
+          new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+          r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+        ]),
+      headStyles: { fillColor: PDF_INDIGO, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+      alternateRowStyles: { fillColor: PDF_INDIGO_LIGHT },
+      styles: { font: 'helvetica', fontSize: 9, cellPadding: 3 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: 'center' },
+        3: { cellWidth: 22, halign: 'center' },
+        4: { cellWidth: 28, halign: 'center' },
+        5: { cellWidth: 20, halign: 'center' },
+      },
+    });
+
+    pdfFooter(doc);
+    doc.save(`raport-interval-${rangeFrom}-${rangeTo}.pdf`);
+  }
+
+  // PDF – Raport elev
+  function exportIstoricPDF() {
+    const doc = new jsPDF();
+    pdfHeader(doc, `Raport elev — Toate materiile`);
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(`${istoricPrenume} ${istoricNume}`, 14, 46);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Total prezențe: ${istoricRecords.length}`, 14, 53);
+
+    autoTable(doc, {
+      startY: 60,
+      head: [['#', 'Data', 'Clasa', 'Materie', 'Ora']],
+      body: istoricRecords.map((r, i) => [
+        i + 1,
+        new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        r.clasa,
+        r.materie ?? '—',
+        r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+      ]),
+      headStyles: { fillColor: PDF_INDIGO, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+      alternateRowStyles: { fillColor: PDF_INDIGO_LIGHT },
+      styles: { font: 'helvetica', fontSize: 10, cellPadding: 4 },
+      columnStyles: {
+        0: { cellWidth: 12, halign: 'center' },
+        1: { cellWidth: 32, halign: 'center' },
+        2: { cellWidth: 25, halign: 'center' },
+        4: { cellWidth: 22, halign: 'center' },
+      },
+    });
+
+    pdfFooter(doc);
+    doc.save(`raport-elev-${istoricPrenume}-${istoricNume}.pdf`);
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -807,6 +982,7 @@ export default function TeacherPage() {
                 {filtered.length > 0 && (
                   <>
                     <button className="btn-action" onClick={exportCSV}>⬇ CSV</button>
+                    <button className="btn-action btn-pdf no-print" onClick={exportPDF}>⬇ PDF</button>
                     <button className="btn-action no-print" onClick={() => window.print()}>🖨 Print</button>
                   </>
                 )}
@@ -965,6 +1141,7 @@ export default function TeacherPage() {
                       <strong>{rangeByStudent.length}</strong> elevi unici
                     </span>
                     <button className="btn-action" onClick={exportRangeCSV}>⬇ CSV</button>
+                    <button className="btn-action btn-pdf" onClick={exportRangePDF}>⬇ PDF</button>
                   </div>
                   <div className="attendance-table-wrap">
                     <div className="istoric-result-header">
@@ -1075,6 +1252,7 @@ export default function TeacherPage() {
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <span className="istoric-count">{istoricRecords.length} prezențe</span>
                         <button className="btn-action" onClick={exportIstoricCSV}>⬇ CSV</button>
+                        <button className="btn-action btn-pdf" onClick={exportIstoricPDF}>⬇ PDF</button>
                       </div>
                     </div>
                     <table className="attendance-table">
