@@ -825,6 +825,53 @@ html, body, #root {
   .stat-card-value { font-size: 1.6rem; }
 }
 
+/* ── Admin panel ── */
+.admin-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.admin-classes-grid {
+  padding: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-class-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--gray-50);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px 6px 10px;
+}
+
+.admin-class-delete {
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.1s, background 0.1s;
+  line-height: 1;
+}
+.admin-class-delete:hover { color: var(--red); background: var(--red-light); }
+.admin-class-delete:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.success-msg {
+  color: var(--green);
+  font-size: 0.875rem;
+  background: var(--green-light);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
 /* ── Print styles ── */
 @media print {
   .teacher-header,

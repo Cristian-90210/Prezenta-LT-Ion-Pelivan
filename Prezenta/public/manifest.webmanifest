@@ -1,0 +1,21 @@
+{
+  "name": "Prezență LT Ion Pelivan",
+  "short_name": "Prezență",
+  "description": "Înregistrare prezență pentru Liceul Teoretic Ion Pelivan",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#2563eb",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "lang": "ro",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["education"]
+}

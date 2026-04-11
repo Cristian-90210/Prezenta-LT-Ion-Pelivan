@@ -6,12 +6,8 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { db } from '../firebase';
 import type { AttendanceRecord } from '../types';
-import { TEACHERS, type Teacher } from '../teachers';
-
-const ALL_CLASSES = [
-  ...['V', 'VI', 'VII', 'VIII', 'IX'].flatMap(cls => ['A', 'B', 'C'].map(lit => `${cls}-${lit}`)),
-  ...['X', 'XI', 'XII'].flatMap(cls => ['REAL', 'UMAN'].map(profil => `${cls}-${profil}`)),
-];
+import { useConfig } from '../hooks/useConfig';
+import type { Teacher } from '../teachers';
 
 type View = 'login' | 'dashboard';
 type DashTab = 'lista' | 'statistici' | 'raport' | 'istoric';
@@ -73,6 +69,7 @@ export default function TeacherPage() {
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeSearched, setRangeSearched] = useState(false);
 
+  const { teachers, classes: ALL_CLASSES } = useConfig();
   const siteUrl = window.location.origin;
 
   // ── Dark mode effect ──────────────────────────────────────────────────────
@@ -136,7 +133,7 @@ export default function TeacherPage() {
   // ── Handlers ──────────────────────────────────────────────────────────────
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    const teacher = TEACHERS.find(t => t.password === password);
+    const teacher = teachers.find(t => t.password === password);
     if (teacher) {
       setCurrentTeacher(teacher);
       setView('dashboard');
@@ -219,7 +216,7 @@ export default function TeacherPage() {
         materie: d.data().materie ?? '',
       }));
       data.sort((a, b) => b.data.localeCompare(a.data));
-      setIstoricRecords(data.filter(r => r.materie === currentTeacher.subject));
+      setIstoricRecords(data);
     } catch (err) {
       console.error(err);
       setIstoricError('Eroare la căutare în baza de date.');
@@ -298,20 +295,21 @@ export default function TeacherPage() {
   function exportIstoricCSV() {
     downloadCSV(
       [
-        [`=== ISTORIC ELEV — ${currentTeacher?.subject ?? ''} ===`],
+        [`=== RAPORT ELEV — Toate materiile ===`],
         ['Elev:', `${istoricPrenume} ${istoricNume}`],
-        ['Total zile prezent:', String(istoricRecords.length)],
+        ['Total prezențe:', String(istoricRecords.length)],
         ['---'],
         null,
-        ['#', 'Data', 'Clasa', 'Ora'],
+        ['#', 'Data', 'Clasa', 'Materie', 'Ora'],
         ...istoricRecords.map((r, i) => [
           String(i + 1),
           new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', { year: 'numeric', month: '2-digit', day: '2-digit' }),
           r.clasa,
+          r.materie ?? '—',
           r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
         ]),
       ],
-      `istoric-${istoricPrenume}-${istoricNume}.csv`
+      `raport-elev-${istoricPrenume}-${istoricNume}.csv`
     );
   }
 
@@ -458,7 +456,7 @@ export default function TeacherPage() {
               {tab === 'lista' ? 'Listă'
                 : tab === 'statistici' ? 'Statistici'
                 : tab === 'raport' ? 'Raport interval'
-                : 'Istoric elev'}
+                : 'Raport elev'}
             </button>
           ))}
         </div>
@@ -879,7 +877,7 @@ export default function TeacherPage() {
           </>
         )}
 
-        {/* ══════════════ TAB: ISTORIC ══════════════ */}
+        {/* ══════════════ TAB: RAPORT ELEV ══════════════ */}
         {dashTab === 'istoric' && (
           <>
             <div className="controls">
@@ -924,41 +922,73 @@ export default function TeacherPage() {
                   Niciun rezultat pentru „{istoricPrenume} {istoricNume}".
                 </div>
               ) : (
-                <div className="attendance-table-wrap">
-                  <div className="istoric-result-header">
-                    <strong>{istoricPrenume} {istoricNume}</strong>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <span className="istoric-count">{istoricRecords.length} zile prezent</span>
-                      <button className="btn-action" onClick={exportIstoricCSV}>⬇ CSV</button>
+                <>
+                  {/* Sumar per materie */}
+                  <div className="stats-summary">
+                    {Object.entries(
+                      istoricRecords.reduce<Record<string, number>>((acc, r) => {
+                        const key = r.materie || 'Nespecificat';
+                        acc[key] = (acc[key] || 0) + 1;
+                        return acc;
+                      }, {})
+                    )
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([subject, count]) => (
+                        <div className="stat-card" key={subject}>
+                          <div className="stat-card-value" style={{ fontSize: '1.6rem' }}>{count}</div>
+                          <div className="stat-card-label">{subject}</div>
+                        </div>
+                      ))
+                    }
+                    <div className="stat-card" style={{ borderTop: '3px solid var(--blue)' }}>
+                      <div className="stat-card-value">{istoricRecords.length}</div>
+                      <div className="stat-card-label">Total prezențe</div>
                     </div>
                   </div>
-                  <table className="attendance-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Data</th>
-                        <th>Clasa</th>
-                        <th>Ora</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {istoricRecords.map((r, i) => (
-                        <tr key={r.id}>
-                          <td className="td-nr">{i + 1}</td>
-                          <td>
-                            {new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', {
-                              weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-                            })}
-                          </td>
-                          <td><span className="badge">{r.clasa}</span></td>
-                          <td className="td-time">
-                            {r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
-                          </td>
+
+                  <div className="attendance-table-wrap">
+                    <div className="istoric-result-header">
+                      <strong>{istoricPrenume} {istoricNume}</strong>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span className="istoric-count">{istoricRecords.length} prezențe</span>
+                        <button className="btn-action" onClick={exportIstoricCSV}>⬇ CSV</button>
+                      </div>
+                    </div>
+                    <table className="attendance-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Data</th>
+                          <th>Clasa</th>
+                          <th>Materie</th>
+                          <th>Ora</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {istoricRecords.map((r, i) => (
+                          <tr key={r.id}>
+                            <td className="td-nr">{i + 1}</td>
+                            <td>
+                              {new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', {
+                                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+                              })}
+                            </td>
+                            <td><span className="badge">{r.clasa}</span></td>
+                            <td>
+                              {r.materie
+                                ? <span className="badge" style={{ background: 'var(--green-light)', color: 'var(--green)' }}>{r.materie}</span>
+                                : <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
+                              }
+                            </td>
+                            <td className="td-time">
+                              {r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )
             )}
           </>
