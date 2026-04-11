@@ -625,54 +625,6 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {/* ── QR Zoom Modal ── */}
-        {qrZoom && (
-          <div className="modal-overlay" onClick={() => setQrZoom(null)}>
-            <div className="qr-zoom-box" onClick={e => e.stopPropagation()}>
-              <div className="qr-zoom-header">
-                <span className="qr-zoom-title">Clasa {qrZoom} — {currentTeacher?.subject}</span>
-                <button className="qr-zoom-close" onClick={() => setQrZoom(null)}>✕</button>
-              </div>
-              <div className="qr-zoom-body">
-                <div className="qr-box">
-                  <QRCodeSVG
-                    value={`${qrBaseUrl}&clasa=${encodeURIComponent(qrZoom)}`}
-                    size={280}
-                    level="H"
-                  />
-                </div>
-                <p className="qr-url" style={{ marginTop: 12 }}>
-                  {`${qrBaseUrl}&clasa=${encodeURIComponent(qrZoom)}`}
-                </p>
-              </div>
-              <div className="qr-zoom-nav">
-                <button
-                  className="btn-action"
-                  onClick={() => {
-                    const idx = ALL_CLASSES.indexOf(qrZoom);
-                    if (idx > 0) setQrZoom(ALL_CLASSES[idx - 1]);
-                  }}
-                  disabled={ALL_CLASSES.indexOf(qrZoom) === 0}
-                >
-                  ← Anterior
-                </button>
-                <span className="qr-zoom-counter">
-                  {ALL_CLASSES.indexOf(qrZoom) + 1} / {ALL_CLASSES.length}
-                </span>
-                <button
-                  className="btn-action"
-                  onClick={() => {
-                    const idx = ALL_CLASSES.indexOf(qrZoom);
-                    if (idx < ALL_CLASSES.length - 1) setQrZoom(ALL_CLASSES[idx + 1]);
-                  }}
-                  disabled={ALL_CLASSES.indexOf(qrZoom) === ALL_CLASSES.length - 1}
-                >
-                  Următor →
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ── Lock Banner ── */}
         {locked && (
@@ -683,18 +635,35 @@ export default function TeacherPage() {
 
         {/* ── QR Modal ── */}
         {qrVisible && (
-          <div className="modal-overlay" onClick={() => setQrVisible(false)}>
+          <div className="modal-overlay" onClick={() => { setQrVisible(false); setQrZoom(null); }}>
             <div className="qr-modal-box" onClick={e => e.stopPropagation()}>
+
+              {/* Header sticky */}
               <div className="qr-zoom-header">
-                <div className="qr-mode-toggle" style={{ margin: 0 }}>
-                  <button className={`qr-mode-btn${qrMode === 'general' ? ' active' : ''}`} onClick={() => setQrMode('general')}>
-                    QR General
+                {qrZoom ? (
+                  <button
+                    className="qr-back-btn"
+                    onClick={() => setQrZoom(null)}
+                  >
+                    ← Înapoi la grilă
                   </button>
-                  <button className={`qr-mode-btn${qrMode === 'perClasa' ? ' active' : ''}`} onClick={() => setQrMode('perClasa')}>
-                    QR per Clasă
-                  </button>
-                </div>
-                <button className="qr-zoom-close" onClick={() => setQrVisible(false)}>✕</button>
+                ) : (
+                  <div className="qr-mode-toggle" style={{ margin: 0 }}>
+                    <button
+                      className={`qr-mode-btn${qrMode === 'general' ? ' active' : ''}`}
+                      onClick={() => { setQrMode('general'); setQrZoom(null); }}
+                    >
+                      QR General
+                    </button>
+                    <button
+                      className={`qr-mode-btn${qrMode === 'perClasa' ? ' active' : ''}`}
+                      onClick={() => setQrMode('perClasa')}
+                    >
+                      QR per Clasă
+                    </button>
+                  </div>
+                )}
+                <button className="qr-zoom-close" onClick={() => { setQrVisible(false); setQrZoom(null); }}>✕</button>
               </div>
 
               <div className="qr-inner">
@@ -709,17 +678,58 @@ export default function TeacherPage() {
                     </div>
                     <p className="qr-url">{qrBaseUrl}</p>
                   </>
+                ) : qrZoom ? (
+                  /* ── Zoom view (inline, same modal) ── */
+                  <div className="qr-zoom-inline">
+                    <div className="qr-zoom-inline-title">
+                      Clasa <strong>{qrZoom}</strong> — {currentTeacher?.subject}
+                    </div>
+                    <div className="qr-box qr-box--zoomed">
+                      <QRCodeSVG
+                        value={`${qrBaseUrl}&clasa=${encodeURIComponent(qrZoom)}`}
+                        size={300}
+                        level="H"
+                      />
+                    </div>
+                    <p className="qr-url">{`${qrBaseUrl}&clasa=${encodeURIComponent(qrZoom)}`}</p>
+                    <div className="qr-zoom-nav">
+                      <button
+                        className="btn-action"
+                        onClick={() => {
+                          const idx = ALL_CLASSES.indexOf(qrZoom);
+                          if (idx > 0) setQrZoom(ALL_CLASSES[idx - 1]);
+                        }}
+                        disabled={ALL_CLASSES.indexOf(qrZoom) === 0}
+                      >
+                        ← Anterior
+                      </button>
+                      <span className="qr-zoom-counter">
+                        {ALL_CLASSES.indexOf(qrZoom) + 1} / {ALL_CLASSES.length}
+                      </span>
+                      <button
+                        className="btn-action"
+                        onClick={() => {
+                          const idx = ALL_CLASSES.indexOf(qrZoom);
+                          if (idx < ALL_CLASSES.length - 1) setQrZoom(ALL_CLASSES[idx + 1]);
+                        }}
+                        disabled={ALL_CLASSES.indexOf(qrZoom) === ALL_CLASSES.length - 1}
+                      >
+                        Următor →
+                      </button>
+                    </div>
+                  </div>
                 ) : (
+                  /* ── Grid view ── */
                   <>
                     <h2>QR per Clasă — {currentTeacher?.subject}</h2>
-                    <p className="qr-sub">Fiecare cod pre-completează clasa automat</p>
+                    <p className="qr-sub">Apasă pe un cod QR pentru a-l mări</p>
                     <div className="qr-grid">
                       {ALL_CLASSES.map(cls => (
                         <div
                           className="qr-class-item qr-class-item--clickable"
                           key={cls}
                           onClick={() => setQrZoom(cls)}
-                          title="Click pentru mărire"
+                          title={`Mărește QR pentru ${cls}`}
                         >
                           <QRCodeSVG
                             value={`${qrBaseUrl}&clasa=${encodeURIComponent(cls)}`}

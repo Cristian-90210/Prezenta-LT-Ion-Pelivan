@@ -1065,6 +1065,41 @@ html, body, #root {
 /* ══════════════════════════════════════════
    QR MODAL
 ══════════════════════════════════════════ */
+.qr-back-btn {
+  background: none;
+  border: none;
+  color: var(--indigo);
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.qr-back-btn:hover { background: var(--indigo-light); }
+
+.qr-zoom-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0 8px;
+  animation: slideUp 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.qr-zoom-inline-title {
+  font-size: 1.1rem;
+  color: var(--text);
+  font-weight: 600;
+  text-align: center;
+}
+.qr-box--zoomed {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
 .qr-modal-box {
   background: var(--surface);
   border-radius: var(--radius);
@@ -1489,6 +1524,384 @@ html, body, #root {
 }
 .sidebar-lock-btn.locked:hover { background: var(--rose); color: #fff; }
 .sidebar-lock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ══════════════════════════════════════════
+   AUTH PAGE
+══════════════════════════════════════════ */
+.auth-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  background: var(--gray-50);
+}
+.auth-tab {
+  flex: 1;
+  padding: 14px;
+  background: none;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-bottom 0.15s;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+.auth-tab.active {
+  color: var(--indigo);
+  border-bottom-color: var(--indigo);
+  background: var(--surface);
+}
+.auth-tab:hover:not(.active) { color: var(--text); background: var(--gray-100); }
+
+.auth-switch-hint {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.auth-link {
+  background: none;
+  border: none;
+  color: var(--indigo);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+.auth-link:hover { opacity: 0.75; }
+
+/* ══════════════════════════════════════════
+   STUDENT DASHBOARD
+══════════════════════════════════════════ */
+.sd-page {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.sd-header {
+  background: var(--header-gradient);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+}
+.sd-header-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sd-header-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.sd-logo-icon { font-size: 1.4rem; }
+.sd-logo-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.sd-logo-sub { font-size: 0.72rem; color: rgba(255,255,255,0.72); font-weight: 500; }
+
+.sd-header-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.sd-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.22);
+  border: 2px solid rgba(255,255,255,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.sd-user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sd-user-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sd-user-class { font-size: 0.72rem; color: rgba(255,255,255,0.72); font-weight: 500; }
+
+.sd-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sd-logout-btn {
+  background: rgba(255,255,255,0.18);
+  border: 1.5px solid rgba(255,255,255,0.35);
+  color: #fff;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sd-logout-btn:hover { background: rgba(255,255,255,0.30); }
+
+/* Main content */
+.sd-main {
+  flex: 1;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 24px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Scan button */
+.sd-scan-btn {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  box-shadow: 0 4px 24px hsla(238,75%,58%,0.38);
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  letter-spacing: -0.01em;
+}
+.sd-scan-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px hsla(238,75%,58%,0.45);
+}
+.sd-scan-icon { font-size: 1.6rem; }
+
+/* QR registration card */
+.sd-qr-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.sd-reg-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.sd-reg-confirm {
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.sd-reg-subject-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.sd-reg-subject-name {
+  font-size: 1.6rem;
+  font-weight: 900;
+  background: var(--header-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.sd-reg-confirm-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.sd-reg-btn {
+  margin-top: 8px;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 15px 40px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 18px hsla(238,75%,58%,0.38);
+  transition: opacity 0.15s, transform 0.15s;
+  width: 100%;
+  max-width: 320px;
+}
+.sd-reg-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+.sd-reg-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.sd-reg-result {
+  padding: 40px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.sd-reg-result-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.sd-reg-done .sd-reg-result-icon { background: var(--green-light); color: var(--green); }
+.sd-reg-already .sd-reg-result-icon { background: var(--indigo-light); color: var(--indigo); }
+.sd-reg-locked .sd-reg-result-icon { background: var(--gray-100); color: var(--gray-600); font-size: 1.5rem; }
+.sd-reg-error .sd-reg-result-icon { background: var(--rose-light); color: var(--rose); }
+
+.sd-reg-result-title { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+.sd-reg-result-sub { font-size: 0.875rem; color: var(--text-muted); line-height: 1.5; }
+
+.sd-back-btn {
+  margin-top: 8px;
+  background: none;
+  border: 1.5px solid var(--border);
+  color: var(--gray-600);
+  border-radius: 999px;
+  padding: 9px 22px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.sd-back-btn:hover { background: var(--indigo-light); color: var(--indigo); border-color: var(--indigo-mid); }
+
+/* Section titles */
+.sd-section-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+}
+.sd-total-badge {
+  background: var(--indigo-light);
+  color: var(--indigo);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border: 1px solid var(--indigo-mid);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sd-subjects-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sd-history-card { border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+
+.sd-loading-text {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 32px;
+  font-size: 0.9rem;
+}
+
+/* QR scanner modal */
+.sd-scanner-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 48px rgba(0,0,0,0.28);
+  width: 100%;
+  max-width: 400px;
+  overflow: hidden;
+  animation: slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.sd-scanner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--indigo-light);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--indigo);
+}
+.sd-scanner-hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  padding: 12px 16px 16px;
+}
+
+@media (max-width: 500px) {
+  .sd-header-inner { padding: 12px 16px; gap: 10px; }
+  .sd-user-name { font-size: 0.82rem; }
+  .sd-main { padding: 16px 14px 40px; }
+  .sd-scan-btn { font-size: 0.95rem; padding: 22px 18px; }
+  .sd-reg-confirm { padding: 24px 18px; }
+  .sd-reg-subject-name { font-size: 1.3rem; }
+}
 
 /* ══════════════════════════════════════════
    FIELD HINT & BTN PREZENTA MEA
