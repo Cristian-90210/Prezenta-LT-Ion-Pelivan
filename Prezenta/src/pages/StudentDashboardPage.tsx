@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, getDocs, getDoc, doc, setDoc, Timestamp, onSnapshot } from 'firebase/firestore';
+import {
+  collection, query, where, getDocs, getDoc,
+  doc, setDoc, Timestamp, onSnapshot,
+} from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
@@ -22,6 +25,7 @@ interface AttRec {
 }
 
 type RegState = 'idle' | 'checking' | 'ready' | 'submitting' | 'done' | 'already' | 'locked' | 'error';
+type StudentTab = 'scan' | 'istoric';
 
 function buildDocId(prenume: string, nume: string, clasa: string, data: string, materieId: string): string {
   const normalize = (s: string) =>
@@ -29,21 +33,28 @@ function buildDocId(prenume: string, nume: string, clasa: string, data: string, 
   return `${normalize(prenume)}|${normalize(nume)}|${clasa.toLowerCase()}|${data}${materieId ? `|${materieId}` : ''}`;
 }
 
+const TAB_ITEMS: { id: StudentTab; icon: string; label: string }[] = [
+  { id: 'scan',    icon: '📷', label: 'Scanează QR' },
+  { id: 'istoric', icon: '📋', label: 'Prezența mea' },
+];
+
 export default function StudentDashboardPage() {
   const { user } = useAuth();
   const { teachers } = useConfig();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const materieId = searchParams.get('materie') ?? '';
-  const clasaFromQR = searchParams.get('clasa') ?? '';
-  const teacher = teachers.find(t => t.id === materieId) ?? null;
+  const materieId   = searchParams.get('materie') ?? '';
+  const clasaFromQR = searchParams.get('clasa')   ?? '';
+  const teacher     = teachers.find(t => t.id === materieId) ?? null;
 
-  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [profile, setProfile]               = useState<StudentProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [records, setRecords] = useState<AttRec[]>([]);
+  const [records, setRecords]               = useState<AttRec[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(true);
 
-  const [regState, setRegState] = useState<RegState>('idle');
+  const [regState, setRegState]   = useState<RegState>('idle');
+  const [dashTab, setDashTab]     = useState<StudentTab>(materieId ? 'scan' : 'scan');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const scannerRef = useRef<any>(null);
 
@@ -54,9 +65,14 @@ export default function StudentDashboardPage() {
     localStorage.setItem('darkMode', String(darkMode));
   }, [darkMode]);
 
+  // Când vine un QR param, mergi automat pe tab-ul scan
+  useEffect(() => {
+    if (materieId) setDashTab('scan');
+  }, [materieId]);
+
   const today = new Date().toISOString().split('T')[0];
 
-  // Load student profile
+  // ── Profil elev ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     getDoc(doc(db, 'students', user.uid)).then(snap => {
@@ -65,7 +81,7 @@ export default function StudentDashboardPage() {
     }).catch(() => setProfileLoading(false));
   }, [user]);
 
-  // Load attendance records
+  // ── Înregistrări prezență ────────────────────────────────────────────────
   const loadRecords = useCallback(async () => {
     if (!user?.email) return;
     setRecordsLoading(true);
@@ -73,10 +89,10 @@ export default function StudentDashboardPage() {
       const q = query(collection(db, 'prezenta'), where('email', '==', user.email));
       const snap = await getDocs(q);
       const data: AttRec[] = snap.docs.map(d => ({
-        id: d.id,
-        data: d.data().data ?? '',
-        materie: d.data().materie ?? '',
-        clasa: d.data().clasa ?? '',
+        id:        d.id,
+        data:      d.data().data      ?? '',
+        materie:   d.data().materie   ?? '',
+        clasa:     d.data().clasa     ?? '',
         timestamp: d.data().timestamp?.toDate() ?? new Date(),
       })).sort((a, b) => b.data.localeCompare(a.data));
       setRecords(data);
@@ -86,13 +102,13 @@ export default function StudentDashboardPage() {
 
   useEffect(() => { loadRecords(); }, [loadRecords]);
 
-  // When a teacher QR is detected (materie param in URL), run pre-check
+  // ── Verificare prezență când vine QR param ───────────────────────────────
   useEffect(() => {
     if (!teacher || !profile) return;
     setRegState('checking');
 
     const lockRef = doc(db, 'settings', 'lock');
-    const unsubLock = onSnapshot(lockRef, async lockSnap => {
+    const unsub = onSnapshot(lockRef, async lockSnap => {
       const isLocked = lockSnap.exists() ? lockSnap.data()[teacher.id] === true : false;
       if (isLocked) { setRegState('locked'); return; }
 
@@ -106,7 +122,7 @@ export default function StudentDashboardPage() {
       }
     }, () => setRegState('error'));
 
-    return () => unsubLock();
+    return () => unsub();
   }, [teacher?.id, profile, clasaFromQR, today]);
 
   async function handleRegister() {
@@ -124,14 +140,14 @@ export default function StudentDashboardPage() {
 
     try {
       await setDoc(doc(db, 'prezenta', docId), {
-        prenume: profile.prenume,
-        nume: profile.nume,
+        prenume:   profile.prenume,
+        nume:      profile.nume,
         clasa,
-        data: today,
+        data:      today,
         timestamp: Timestamp.now(),
         ip,
-        email: user.email,
-        materie: teacher.subject,
+        email:     user.email,
+        materie:   teacher.subject,
       });
       setRegState('done');
       loadRecords();
@@ -140,7 +156,7 @@ export default function StudentDashboardPage() {
     }
   }
 
-  // QR Scanner modal
+  // ── QR Scanner ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!scannerOpen) return;
     let scanner: any;
@@ -157,8 +173,8 @@ export default function StudentDashboardPage() {
           setScannerOpen(false);
           try {
             const url = new URL(decodedText);
-            const m = url.searchParams.get('materie');
-            const c = url.searchParams.get('clasa');
+            const m   = url.searchParams.get('materie');
+            const c   = url.searchParams.get('clasa');
             if (m) {
               const params: Record<string, string> = { materie: m };
               if (c) params.clasa = c;
@@ -179,7 +195,7 @@ export default function StudentDashboardPage() {
     };
   }, [scannerOpen]);
 
-  // Derived stats
+  // ── Date derivate pentru statistici ─────────────────────────────────────
   const bySubject = records.reduce<{ [k: string]: number }>((acc, r) => {
     const key = r.materie || 'Nespecificat';
     acc[key] = (acc[key] || 0) + 1;
@@ -197,6 +213,11 @@ export default function StudentDashboardPage() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
+  function goTab(tab: StudentTab) {
+    setDashTab(tab);
+    setSidebarOpen(false);
+  }
+
   if (profileLoading) {
     return (
       <div className="page-center">
@@ -206,171 +227,296 @@ export default function StudentDashboardPage() {
   }
 
   return (
-    <div className="sd-page">
+    <div className="teacher-page">
+
+      {/* ══════════ SIDEBAR MOBIL ══════════ */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}>
+          <div className="sidebar" onClick={e => e.stopPropagation()}>
+
+            <div className="sidebar-header">
+              <span className="sidebar-logo">🎓 LT Ion Pelivan</span>
+              <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
+            </div>
+
+            {/* Profil elev */}
+            {profile && (
+              <div className="sidebar-profile">
+                <div className="sidebar-avatar">
+                  {profile.prenume.charAt(0).toUpperCase()}
+                </div>
+                <div className="sidebar-profile-info">
+                  <span className="sidebar-profile-name">{profile.prenume} {profile.nume}</span>
+                  <span className="sidebar-profile-sub">Clasa {profile.clasa}</span>
+                  <span className="sidebar-badge">Elev</span>
+                </div>
+              </div>
+            )}
+
+            {/* Navigare */}
+            <nav className="sidebar-nav">
+              {TAB_ITEMS.map(item => (
+                <button
+                  key={item.id}
+                  className={`sidebar-nav-item${dashTab === item.id ? ' active' : ''}`}
+                  onClick={() => goTab(item.id)}
+                >
+                  <span className="sidebar-nav-icon">{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+
+            {/* Footer */}
+            <div className="sidebar-footer">
+              <div className="sidebar-toggle-row">
+                <span className="sidebar-toggle-label">🌙 Mod întunecat</span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={darkMode}
+                    onChange={() => setDarkMode(d => !d)}
+                  />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <button className="sidebar-logout" onClick={() => signOut(auth)}>
+                ↩ Deconectare
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ══════════ END SIDEBAR ══════════ */}
+
       {/* ── Header ── */}
-      <header className="sd-header">
-        <div className="sd-header-inner">
-          <div className="sd-header-logo">
-            <span className="sd-logo-icon">🎓</span>
+      <header className="teacher-header">
+        <div className="header-content">
+          <button className="btn-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+
+          <div className="header-title">
+            <span className="school-icon-sm">🎓</span>
             <div>
-              <div className="sd-logo-title">Prezență</div>
-              <div className="sd-logo-sub">LT Ion Pelivan</div>
+              <h1>Prezență</h1>
+              <span className="header-teacher-name">LT Ion Pelivan</span>
             </div>
           </div>
 
-          {profile && (
-            <div className="sd-header-user">
-              <div className="sd-user-avatar">
-                {profile.prenume.charAt(0).toUpperCase()}
-              </div>
-              <div className="sd-user-info">
-                <span className="sd-user-name">{profile.prenume} {profile.nume}</span>
-                <span className="sd-user-class">Clasa {profile.clasa}</span>
-              </div>
-            </div>
-          )}
+          {/* Tab-uri desktop */}
+          <nav className="dash-tabs header-actions-desktop">
+            {TAB_ITEMS.map(item => (
+              <button
+                key={item.id}
+                className={`dash-tab${dashTab === item.id ? ' active' : ''}`}
+                onClick={() => goTab(item.id)}
+              >
+                {item.icon} {item.label}
+              </button>
+            ))}
+          </nav>
 
-          <div className="sd-header-actions">
+          {/* Acțiuni dreapta desktop */}
+          <div className="header-actions-desktop" style={{ gap: 8, display: 'flex', alignItems: 'center' }}>
+            {profile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 4 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.22)', border: '2px solid rgba(255,255,255,0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.9rem', fontWeight: 800, color: '#fff', flexShrink: 0,
+                }}>
+                  {profile.prenume.charAt(0).toUpperCase()}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>
+                    {profile.prenume} {profile.nume}
+                  </span>
+                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.72)' }}>
+                    Clasa {profile.clasa}
+                  </span>
+                </div>
+              </div>
+            )}
             <button className="btn-dark-toggle" onClick={() => setDarkMode(d => !d)} title="Schimbă tema">
               {darkMode ? '☀' : '🌙'}
             </button>
-            <button className="sd-logout-btn" onClick={() => signOut(auth)}>
-              Ieșire
+            <button
+              className="btn-secondary"
+              onClick={() => signOut(auth)}
+              style={{ fontSize: '0.82rem', padding: '7px 14px' }}
+            >
+              ↩ Ieșire
             </button>
           </div>
         </div>
+
+        {/* Tab-uri mobile (sub header) */}
+        <div className="dash-tabs" style={{ borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+          {TAB_ITEMS.map(item => (
+            <button
+              key={item.id}
+              className={`dash-tab${dashTab === item.id ? ' active' : ''}`}
+              onClick={() => goTab(item.id)}
+            >
+              {item.icon} {item.label}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <main className="sd-main">
+      {/* ── Conținut principal ── */}
+      <main className="teacher-main" style={{ paddingTop: 24 }}>
 
-        {/* ── QR registration card (when URL has materie param) ── */}
-        {teacher ? (
-          <div className="sd-qr-card">
-            {regState === 'checking' && (
-              <div className="sd-reg-loading">Se verifică prezența...</div>
-            )}
-
-            {regState === 'already' && (
-              <div className="sd-reg-result sd-reg-already">
-                <div className="sd-reg-result-icon">✓</div>
-                <div className="sd-reg-result-title">Prezență deja marcată</div>
-                <div className="sd-reg-result-sub">Ai înregistrat prezența la {teacher.subject} astăzi.</div>
-                <button className="sd-back-btn" onClick={() => setSearchParams({})}>← Înapoi la dashboard</button>
-              </div>
-            )}
-
-            {regState === 'locked' && (
-              <div className="sd-reg-result sd-reg-locked">
-                <div className="sd-reg-result-icon">🔒</div>
-                <div className="sd-reg-result-title">Înregistrare blocată</div>
-                <div className="sd-reg-result-sub">Profesorul a închis înregistrarea prezentei.</div>
-                <button className="sd-back-btn" onClick={() => setSearchParams({})}>← Înapoi la dashboard</button>
-              </div>
-            )}
-
-            {regState === 'done' && (
-              <div className="sd-reg-result sd-reg-done">
-                <div className="sd-reg-result-icon">✓</div>
-                <div className="sd-reg-result-title">Prezență înregistrată!</div>
-                <div className="sd-reg-result-sub">{teacher.subject} · {dateStr}</div>
-                <button className="sd-back-btn" onClick={() => setSearchParams({})}>← Înapoi la dashboard</button>
-              </div>
-            )}
-
-            {regState === 'error' && (
-              <div className="sd-reg-result sd-reg-error">
-                <div className="sd-reg-result-icon">!</div>
-                <div className="sd-reg-result-title">Eroare de conexiune</div>
-                <div className="sd-reg-result-sub">Verificați conexiunea și reîncercați.</div>
-                <button className="sd-back-btn" onClick={() => setSearchParams({})}>← Înapoi</button>
-              </div>
-            )}
-
-            {(regState === 'ready' || regState === 'submitting') && profile && (
-              <div className="sd-reg-confirm">
-                <div className="sd-reg-subject-label">Ora de</div>
-                <div className="sd-reg-subject-name">{teacher.subject}</div>
-                <div className="sd-reg-confirm-meta">
-                  <span>{profile.prenume} {profile.nume}</span>
-                  <span>·</span>
-                  <span>Clasa {clasaFromQR || profile.clasa}</span>
-                  <span>·</span>
-                  <span>{dateStr}</span>
-                </div>
-                <button
-                  className="sd-reg-btn"
-                  onClick={handleRegister}
-                  disabled={regState === 'submitting'}
-                >
-                  {regState === 'submitting' ? 'Se înregistrează...' : '✓  Marchează prezența'}
-                </button>
-                <button className="sd-back-btn" style={{ marginTop: 8 }} onClick={() => setSearchParams({})}>
-                  Anulează
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* ── Scan QR button ── */
-          <button className="sd-scan-btn" onClick={() => setScannerOpen(true)}>
-            <span className="sd-scan-icon">📷</span>
-            <span>Scanează codul QR al profesorului</span>
-          </button>
-        )}
-
-        {/* ── Stats by subject ── */}
-        {subjectEntries.length > 0 && (
+        {/* ══ TAB: Scanează QR ══ */}
+        {dashTab === 'scan' && (
           <>
-            <div className="sd-section-title">Prezențe per materie</div>
-            <div className="sd-subjects-card">
-              {subjectEntries.map(([subject, count]) => (
-                <div className="pm-subject-row" key={subject}>
-                  <span className="pm-subject-name">{subject}</span>
-                  <div className="pm-subject-bar-track">
-                    <div className="pm-subject-bar-fill" style={{ width: `${(count / maxCount) * 100}%` }} />
+            {teacher ? (
+              /* Card înregistrare prezență (vine din QR) */
+              <div className="sd-qr-card" style={{ maxWidth: 520, margin: '0 auto', width: '100%' }}>
+                {regState === 'checking' && (
+                  <div className="sd-reg-loading">Se verifică prezența...</div>
+                )}
+
+                {regState === 'already' && (
+                  <div className="sd-reg-result sd-reg-already">
+                    <div className="sd-reg-result-icon">✓</div>
+                    <div className="sd-reg-result-title">Prezență deja marcată</div>
+                    <div className="sd-reg-result-sub">Ai înregistrat prezența la <strong>{teacher.subject}</strong> astăzi.</div>
+                    <button className="sd-back-btn" onClick={() => setSearchParams({})}>← Înapoi</button>
                   </div>
-                  <span className="pm-subject-count">{count} {count === 1 ? 'zi' : 'zile'}</span>
-                </div>
-              ))}
-            </div>
+                )}
+
+                {regState === 'locked' && (
+                  <div className="sd-reg-result sd-reg-locked">
+                    <div className="sd-reg-result-icon">🔒</div>
+                    <div className="sd-reg-result-title">Înregistrare blocată</div>
+                    <div className="sd-reg-result-sub">Profesorul a închis înregistrarea prezentei.</div>
+                    <button className="sd-back-btn" onClick={() => setSearchParams({})}>← Înapoi</button>
+                  </div>
+                )}
+
+                {regState === 'done' && (
+                  <div className="sd-reg-result sd-reg-done">
+                    <div className="sd-reg-result-icon">✓</div>
+                    <div className="sd-reg-result-title">Prezență înregistrată!</div>
+                    <div className="sd-reg-result-sub">{teacher.subject} · {dateStr}</div>
+                    <button className="sd-back-btn" onClick={() => setSearchParams({})}>← Înapoi</button>
+                  </div>
+                )}
+
+                {regState === 'error' && (
+                  <div className="sd-reg-result sd-reg-error">
+                    <div className="sd-reg-result-icon">!</div>
+                    <div className="sd-reg-result-title">Eroare de conexiune</div>
+                    <div className="sd-reg-result-sub">Verificați conexiunea și reîncercați.</div>
+                    <button className="sd-back-btn" onClick={() => setSearchParams({})}>← Înapoi</button>
+                  </div>
+                )}
+
+                {(regState === 'ready' || regState === 'submitting') && profile && (
+                  <div className="sd-reg-confirm">
+                    <div className="sd-reg-subject-label">Ora de</div>
+                    <div className="sd-reg-subject-name">{teacher.subject}</div>
+                    <div className="sd-reg-confirm-meta">
+                      <span>{profile.prenume} {profile.nume}</span>
+                      <span>·</span>
+                      <span>Clasa {clasaFromQR || profile.clasa}</span>
+                      <span>·</span>
+                      <span>{dateStr}</span>
+                    </div>
+                    <button
+                      className="sd-reg-btn"
+                      onClick={handleRegister}
+                      disabled={regState === 'submitting'}
+                    >
+                      {regState === 'submitting' ? 'Se înregistrează...' : '✓  Marchează prezența'}
+                    </button>
+                    <button className="sd-back-btn" style={{ marginTop: 8 }} onClick={() => setSearchParams({})}>
+                      Anulează
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Buton scan QR */
+              <div style={{ maxWidth: 520, margin: '0 auto', width: '100%' }}>
+                <button className="sd-scan-btn" onClick={() => setScannerOpen(true)}>
+                  <span className="sd-scan-icon">📷</span>
+                  <span>Scanează codul QR al profesorului</span>
+                </button>
+                <p style={{
+                  textAlign: 'center', color: 'var(--text-muted)',
+                  fontSize: '0.875rem', marginTop: 16, lineHeight: 1.6,
+                }}>
+                  Deschide camera și îndreaptă spre codul QR afișat de profesor pentru a marca prezența automat.
+                </p>
+              </div>
+            )}
           </>
         )}
 
-        {/* ── History ── */}
-        <div className="sd-section-title">
-          Istoricul prezenței
-          {records.length > 0 && (
-            <span className="sd-total-badge">{records.length} total</span>
-          )}
-        </div>
+        {/* ══ TAB: Prezența mea ══ */}
+        {dashTab === 'istoric' && (
+          <div style={{ maxWidth: 720, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {recordsLoading ? (
-          <div className="sd-loading-text">Se încarcă istoricul...</div>
-        ) : records.length === 0 ? (
-          <div className="empty-state">Nicio prezență înregistrată încă.<br />Scanează un cod QR pentru a începe.</div>
-        ) : (
-          <div className="pm-records sd-history-card">
-            {records.map(r => (
-              <div className="pm-record-row" key={r.id}>
-                <div className="pm-record-date">{fmtDate(r.data)}</div>
-                <div className="pm-record-badges">
-                  <span className="badge">{r.clasa}</span>
-                  {r.materie && (
-                    <span className="badge" style={{ background: 'var(--green-light)', color: 'var(--green)' }}>
-                      {r.materie}
-                    </span>
-                  )}
+            {/* Rezumat per materie */}
+            {subjectEntries.length > 0 && (
+              <>
+                <div className="sd-section-title">Prezențe per materie</div>
+                <div className="sd-subjects-card">
+                  {subjectEntries.map(([subject, count]) => (
+                    <div className="pm-subject-row" key={subject}>
+                      <span className="pm-subject-name">{subject}</span>
+                      <div className="pm-subject-bar-track">
+                        <div className="pm-subject-bar-fill" style={{ width: `${(count / maxCount) * 100}%` }} />
+                      </div>
+                      <span className="pm-subject-count">{count} {count === 1 ? 'zi' : 'zile'}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="pm-record-time">
-                  {r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
-                </div>
+              </>
+            )}
+
+            {/* Istoric */}
+            <div className="sd-section-title">
+              Istoricul detaliat
+              {records.length > 0 && (
+                <span className="sd-total-badge">{records.length} total</span>
+              )}
+            </div>
+
+            {recordsLoading ? (
+              <div className="sd-loading-text">Se încarcă istoricul...</div>
+            ) : records.length === 0 ? (
+              <div className="empty-state">
+                Nicio prezență înregistrată încă.<br />
+                Mergi la „Scanează QR" pentru a începe.
               </div>
-            ))}
+            ) : (
+              <div className="pm-records sd-history-card">
+                {records.map(r => (
+                  <div className="pm-record-row" key={r.id}>
+                    <div className="pm-record-date">{fmtDate(r.data)}</div>
+                    <div className="pm-record-badges">
+                      <span className="badge">{r.clasa}</span>
+                      {r.materie && (
+                        <span className="badge" style={{ background: 'var(--green-light)', color: 'var(--green)' }}>
+                          {r.materie}
+                        </span>
+                      )}
+                    </div>
+                    <div className="pm-record-time">
+                      {r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
 
-      {/* ── QR Scanner modal ── */}
+      {/* ── Scanner modal ── */}
       {scannerOpen && (
         <div className="modal-overlay" onClick={() => setScannerOpen(false)}>
           <div className="sd-scanner-modal" onClick={e => e.stopPropagation()}>
