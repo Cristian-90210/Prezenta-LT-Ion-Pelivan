@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  sendEmailVerification, sendPasswordResetEmail,
+} from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useConfig } from '../hooks/useConfig';
 
-type AuthMode = 'login' | 'register';
+type AuthMode = 'login' | 'register' | 'reset';
 
 function authErrorMsg(code: string): string {
   switch (code) {
@@ -29,6 +32,7 @@ export default function AuthPage() {
   const [clasa, setClasa] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
   useEffect(() => {
@@ -39,6 +43,22 @@ export default function AuthPage() {
   function switchMode(m: AuthMode) {
     setMode(m);
     setError('');
+    setResetSent(false);
+  }
+
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!email.trim()) { setError('Introduceți adresa de email.'); return; }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      setResetSent(true);
+    } catch (err: any) {
+      setError(authErrorMsg(err.code));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -97,22 +117,69 @@ export default function AuthPage() {
           <p className="subtitle">Sistem de Prezență</p>
         </div>
 
-        <div className="auth-tabs">
-          <button
-            className={`auth-tab${mode === 'login' ? ' active' : ''}`}
-            onClick={() => switchMode('login')}
-          >
-            Conectare
-          </button>
-          <button
-            className={`auth-tab${mode === 'register' ? ' active' : ''}`}
-            onClick={() => switchMode('register')}
-          >
-            Cont nou
-          </button>
-        </div>
+        {mode !== 'reset' && (
+          <div className="auth-tabs">
+            <button
+              className={`auth-tab${mode === 'login' ? ' active' : ''}`}
+              onClick={() => switchMode('login')}
+            >
+              Conectare
+            </button>
+            <button
+              className={`auth-tab${mode === 'register' ? ' active' : ''}`}
+              onClick={() => switchMode('register')}
+            >
+              Cont nou
+            </button>
+          </div>
+        )}
 
-        {mode === 'login' ? (
+        {mode === 'reset' ? (
+          <div className="form">
+            {resetSent ? (
+              <div className="reset-success">
+                <div className="reset-success-icon">📧</div>
+                <p className="reset-success-title">Email trimis!</p>
+                <p className="reset-success-sub">
+                  Verifică inbox-ul la <strong>{email}</strong> și urmează instrucțiunile pentru a-ți reseta parola.
+                </p>
+                <button className="btn-primary" onClick={() => switchMode('login')}>
+                  ← Înapoi la conectare
+                </button>
+              </div>
+            ) : (
+              <>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 4, lineHeight: 1.6 }}>
+                  Introdu adresa de email și îți trimitem un link de resetare a parolei.
+                </p>
+                <form onSubmit={handleReset}>
+                  <div className="field">
+                    <label htmlFor="reset-email">Email</label>
+                    <input
+                      id="reset-email"
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="ion.popescu@scoala.ro"
+                      autoComplete="email"
+                      autoFocus
+                      disabled={loading}
+                    />
+                  </div>
+                  {error && <p className="error-msg">{error}</p>}
+                  <button type="submit" className="btn-primary" disabled={loading}>
+                    {loading ? 'Se trimite...' : '📧 Trimite email de resetare'}
+                  </button>
+                </form>
+                <p className="auth-switch-hint">
+                  <button type="button" className="auth-link" onClick={() => switchMode('login')}>
+                    ← Înapoi la conectare
+                  </button>
+                </p>
+              </>
+            )}
+          </div>
+        ) : mode === 'login' ? (
           <form onSubmit={handleLogin} className="form">
             <div className="field">
               <label htmlFor="auth-email">Email</label>
@@ -144,6 +211,10 @@ export default function AuthPage() {
               {loading ? 'Se conectează...' : 'Conectare'}
             </button>
             <p className="auth-switch-hint">
+              <button type="button" className="auth-link" onClick={() => switchMode('reset')}>
+                Am uitat parola
+              </button>
+              {' · '}
               Nu ai cont?{' '}
               <button type="button" className="auth-link" onClick={() => switchMode('register')}>
                 Creează unul

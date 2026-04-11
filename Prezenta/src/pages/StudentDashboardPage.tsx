@@ -26,7 +26,7 @@ interface AttRec {
 }
 
 type RegState = 'idle' | 'checking' | 'ready' | 'submitting' | 'done' | 'already' | 'locked' | 'error';
-type StudentTab = 'scan' | 'istoric';
+type StudentTab = 'scan' | 'istoric' | 'profil';
 
 function buildDocId(prenume: string, nume: string, clasa: string, data: string, materieId: string): string {
   const normalize = (s: string) =>
@@ -37,11 +37,12 @@ function buildDocId(prenume: string, nume: string, clasa: string, data: string, 
 const TAB_ITEMS: { id: StudentTab; icon: string; label: string }[] = [
   { id: 'scan',    icon: '📷', label: 'Scanează QR' },
   { id: 'istoric', icon: '📋', label: 'Prezența mea' },
+  { id: 'profil',  icon: '👤', label: 'Profilul meu' },
 ];
 
 export default function StudentDashboardPage() {
   const { user } = useAuth();
-  const { teachers } = useConfig();
+  const { teachers, classes } = useConfig();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const materieId   = searchParams.get('materie') ?? '';
@@ -59,8 +60,15 @@ export default function StudentDashboardPage() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const scannerRef = useRef<any>(null);
 
-  const [verifSent, setVerifSent]     = useState(false);
-  const [verifLoading, setVerifLoading] = useState(false);
+  const [verifSent, setVerifSent]         = useState(false);
+  const [verifLoading, setVerifLoading]   = useState(false);
+
+  // Editare profil
+  const [editPrenume, setEditPrenume]   = useState('');
+  const [editNume, setEditNume]         = useState('');
+  const [editClasa, setEditClasa]       = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg]     = useState('');
 
   const isOnline = useOnlineStatus();
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
@@ -81,7 +89,13 @@ export default function StudentDashboardPage() {
   useEffect(() => {
     if (!user) return;
     getDoc(doc(db, 'students', user.uid)).then(snap => {
-      if (snap.exists()) setProfile(snap.data() as StudentProfile);
+      if (snap.exists()) {
+        const p = snap.data() as StudentProfile;
+        setProfile(p);
+        setEditPrenume(p.prenume);
+        setEditNume(p.nume);
+        setEditClasa(p.clasa);
+      }
       setProfileLoading(false);
     }).catch(() => setProfileLoading(false));
   }, [user]);
@@ -138,6 +152,29 @@ export default function StudentDashboardPage() {
       setVerifSent(true);
     } catch {}
     setVerifLoading(false);
+  }
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || !profile) return;
+    const prenume = editPrenume.trim();
+    const nume    = editNume.trim();
+    if (!prenume || !nume || !editClasa) {
+      setProfileMsg('Completează toate câmpurile.');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileMsg('');
+    try {
+      const updated: StudentProfile = { ...profile, prenume, nume, clasa: editClasa };
+      await setDoc(doc(db, 'students', user.uid), updated);
+      setProfile(updated);
+      setProfileMsg('✓ Profilul a fost actualizat!');
+    } catch {
+      setProfileMsg('Eroare la salvare. Încearcă din nou.');
+    }
+    setProfileSaving(false);
+    setTimeout(() => setProfileMsg(''), 4000);
   }
 
   async function handleRegister() {
@@ -549,6 +586,120 @@ export default function StudentDashboardPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ══ TAB: Profilul meu ══ */}
+        {dashTab === 'profil' && profile && (
+          <div style={{ maxWidth: 480, margin: '0 auto', width: '100%' }}>
+            <div className="controls">
+              <h3 className="admin-section-title">Editează profilul</h3>
+              <form onSubmit={handleSaveProfile}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div className="field" style={{ flex: 1 }}>
+                    <label htmlFor="ep-prenume">Prenume</label>
+                    <input
+                      id="ep-prenume"
+                      type="text"
+                      value={editPrenume}
+                      onChange={e => setEditPrenume(e.target.value)}
+                      disabled={profileSaving}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="field" style={{ flex: 1 }}>
+                    <label htmlFor="ep-nume">Nume de familie</label>
+                    <input
+                      id="ep-nume"
+                      type="text"
+                      value={editNume}
+                      onChange={e => setEditNume(e.target.value)}
+                      disabled={profileSaving}
+                    />
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="ep-clasa">Clasa</label>
+                  <select
+                    id="ep-clasa"
+                    value={editClasa}
+                    onChange={e => setEditClasa(e.target.value)}
+                    disabled={profileSaving}
+                  >
+                    <option value="">— Alege clasa —</option>
+                    {(() => {
+                      const gimn  = classes.filter(c => /^(V|VI|VII|VIII|IX)-/.test(c));
+                      const liceu = classes.filter(c => /^(X|XI|XII)-/.test(c));
+                      const alte  = classes.filter(c => !gimn.includes(c) && !liceu.includes(c));
+                      return (
+                        <>
+                          {gimn.length  > 0 && <optgroup label="Clasele V–IX">{gimn.map(c  => <option key={c} value={c}>{c}</option>)}</optgroup>}
+                          {liceu.length > 0 && <optgroup label="Clasele X–XII">{liceu.map(c => <option key={c} value={c}>{c}</option>)}</optgroup>}
+                          {alte.length  > 0 && <optgroup label="Altele">{alte.map(c        => <option key={c} value={c}>{c}</option>)}</optgroup>}
+                        </>
+                      );
+                    })()}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    value={profile.email}
+                    disabled
+                    style={{ opacity: 0.6, cursor: 'not-allowed' }}
+                  />
+                  <span className="field-hint">Emailul nu poate fi modificat.</span>
+                </div>
+
+                {profileMsg && (
+                  <p
+                    className={profileMsg.startsWith('✓') ? 'success-msg' : 'error-msg'}
+                    style={{ marginBottom: 8 }}
+                  >
+                    {profileMsg}
+                  </p>
+                )}
+
+                <button type="submit" className="btn-primary" disabled={profileSaving}>
+                  {profileSaving ? 'Se salvează...' : 'Salvează modificările'}
+                </button>
+              </form>
+            </div>
+
+            {/* Info cont */}
+            <div className="controls" style={{ marginTop: 0 }}>
+              <h3 className="admin-section-title">Informații cont</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Email verificat</span>
+                  <span style={{
+                    fontWeight: 700, fontSize: '0.82rem',
+                    color: user?.emailVerified ? 'var(--green)' : 'var(--rose)',
+                  }}>
+                    {user?.emailVerified ? '✓ Verificat' : '✗ Neverificat'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Total prezențe</span>
+                  <span style={{ fontWeight: 700, color: 'var(--indigo)' }}>{records.length}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Materii frecventate</span>
+                  <span style={{ fontWeight: 700, color: 'var(--indigo)' }}>{Object.keys(bySubject).length}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              className="sidebar-logout"
+              style={{ width: '100%', marginTop: 8 }}
+              onClick={() => signOut(auth)}
+            >
+              ↩ Deconectare
+            </button>
           </div>
         )}
       </main>
