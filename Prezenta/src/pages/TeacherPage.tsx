@@ -40,6 +40,9 @@ export default function TeacherPage() {
   const [locked, setLocked] = useState(false);
   const [lockLoading, setLockLoading] = useState(false);
 
+  // ── Mobile sidebar ──────────────────────────────────────────────────────────
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   // ── Delete ────────────────────────────────────────────────────────────────
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -416,15 +419,123 @@ export default function TeacherPage() {
   }
 
   // ── Dashboard ──────────────────────────────────────────────────────────────
+  const TAB_ITEMS: { id: DashTab; icon: string; label: string }[] = [
+    { id: 'lista',      icon: '📋', label: 'Listă' },
+    { id: 'statistici', icon: '📊', label: 'Statistici' },
+    { id: 'raport',     icon: '📅', label: 'Raport interval' },
+    { id: 'istoric',    icon: '👤', label: 'Raport elev' },
+  ];
+
   return (
     <div className="teacher-page">
+
+      {/* ══════════ MOBILE SIDEBAR ══════════ */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}>
+          <div className="sidebar" onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="sidebar-header">
+              <span className="sidebar-logo">🎓 LT Ion Pelivan</span>
+              <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
+            </div>
+
+            {/* Profil profesor */}
+            <div className="sidebar-profile">
+              <div className="sidebar-avatar">
+                {currentTeacher?.name?.charAt(0).toUpperCase() ?? '👩'}
+              </div>
+              <div className="sidebar-profile-info">
+                <span className="sidebar-profile-name">{currentTeacher?.name}</span>
+                <span className="sidebar-profile-sub">{currentTeacher?.subject}</span>
+                <span className="sidebar-badge">Profesor</span>
+              </div>
+            </div>
+
+            {/* Navigare tab-uri */}
+            <nav className="sidebar-nav">
+              {TAB_ITEMS.map(item => (
+                <button
+                  key={item.id}
+                  className={`sidebar-nav-item${dashTab === item.id ? ' active' : ''}`}
+                  onClick={() => { setDashTab(item.id); setSidebarOpen(false); }}
+                >
+                  <span className="sidebar-nav-icon">{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+
+            {/* Footer */}
+            <div className="sidebar-footer">
+              {/* Blocare */}
+              <div className="sidebar-lock-row">
+                <span className="sidebar-lock-label">
+                  {locked ? '🔒 Înregistrare blocată' : '🔓 Înregistrare activă'}
+                </span>
+                <button
+                  className={`sidebar-lock-btn${locked ? ' locked' : ''}`}
+                  onClick={handleToggleLock}
+                  disabled={lockLoading}
+                >
+                  {locked ? 'Deschide' : 'Blochează'}
+                </button>
+              </div>
+
+              {/* QR Toggle */}
+              <div className="sidebar-toggle-row">
+                <span className="sidebar-toggle-label">📱 Afișează QR</span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={qrVisible}
+                    onChange={() => { setQrVisible(v => !v); setSidebarOpen(false); }}
+                  />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+
+              {/* Dark mode */}
+              <div className="sidebar-toggle-row">
+                <span className="sidebar-toggle-label">🌙 Mod întunecat</span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={darkMode}
+                    onChange={() => setDarkMode(d => !d)}
+                  />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+
+              {/* Deconectare */}
+              <button className="sidebar-logout" onClick={() => { handleLogout(); setSidebarOpen(false); }}>
+                ↩ Deconectare
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ══════════ END SIDEBAR ══════════ */}
+
       <header className="teacher-header">
         <div className="header-content">
           <div className="header-title">
             <h1>👩‍🏫 {currentTeacher?.subject}</h1>
             <span className="header-teacher-name">{currentTeacher?.name}</span>
           </div>
-          <div className="header-actions">
+
+          {/* Hamburger — doar mobil */}
+          <button
+            className="btn-hamburger"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Deschide meniu"
+          >
+            ☰
+          </button>
+
+          {/* Acțiuni — doar desktop */}
+          <div className="header-actions header-actions-desktop">
             <button
               className={`btn-lock${locked ? ' locked' : ''}`}
               onClick={handleToggleLock}
@@ -447,16 +558,13 @@ export default function TeacherPage() {
           </div>
         </div>
         <div className="dash-tabs">
-          {(['lista', 'statistici', 'raport', 'istoric'] as DashTab[]).map(tab => (
+          {TAB_ITEMS.map(item => (
             <button
-              key={tab}
-              className={`dash-tab${dashTab === tab ? ' active' : ''}`}
-              onClick={() => setDashTab(tab)}
+              key={item.id}
+              className={`dash-tab${dashTab === item.id ? ' active' : ''}`}
+              onClick={() => setDashTab(item.id)}
             >
-              {tab === 'lista' ? 'Listă'
-                : tab === 'statistici' ? 'Statistici'
-                : tab === 'raport' ? 'Raport interval'
-                : 'Raport elev'}
+              {item.label}
             </button>
           ))}
         </div>
@@ -573,53 +681,58 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {/* ── QR Panel ── */}
+        {/* ── QR Modal ── */}
         {qrVisible && (
-          <div className="qr-panel">
-            <div className="qr-inner">
-              <div className="qr-mode-toggle">
-                <button className={`qr-mode-btn${qrMode === 'general' ? ' active' : ''}`} onClick={() => setQrMode('general')}>
-                  QR General
-                </button>
-                <button className={`qr-mode-btn${qrMode === 'perClasa' ? ' active' : ''}`} onClick={() => setQrMode('perClasa')}>
-                  QR per Clasă
-                </button>
+          <div className="modal-overlay" onClick={() => setQrVisible(false)}>
+            <div className="qr-modal-box" onClick={e => e.stopPropagation()}>
+              <div className="qr-zoom-header">
+                <div className="qr-mode-toggle" style={{ margin: 0 }}>
+                  <button className={`qr-mode-btn${qrMode === 'general' ? ' active' : ''}`} onClick={() => setQrMode('general')}>
+                    QR General
+                  </button>
+                  <button className={`qr-mode-btn${qrMode === 'perClasa' ? ' active' : ''}`} onClick={() => setQrMode('perClasa')}>
+                    QR per Clasă
+                  </button>
+                </div>
+                <button className="qr-zoom-close" onClick={() => setQrVisible(false)}>✕</button>
               </div>
 
-              {qrMode === 'general' ? (
-                <>
-                  <h2>QR — {currentTeacher?.subject}</h2>
-                  <p className="qr-sub">
-                    Elevii scanează pentru a marca prezența la <strong>{currentTeacher?.subject}</strong>
-                  </p>
-                  <div className="qr-box">
-                    <QRCodeSVG value={qrBaseUrl} size={220} level="H" />
-                  </div>
-                  <p className="qr-url">{qrBaseUrl}</p>
-                </>
-              ) : (
-                <>
-                  <h2>QR per Clasă — {currentTeacher?.subject}</h2>
-                  <p className="qr-sub">Fiecare cod pre-completează clasa automat</p>
-                  <div className="qr-grid">
-                    {ALL_CLASSES.map(cls => (
-                      <div
-                        className="qr-class-item qr-class-item--clickable"
-                        key={cls}
-                        onClick={() => setQrZoom(cls)}
-                        title="Click pentru mărire"
-                      >
-                        <QRCodeSVG
-                          value={`${qrBaseUrl}&clasa=${encodeURIComponent(cls)}`}
-                          size={110}
-                          level="M"
-                        />
-                        <span className="qr-class-label">{cls}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+              <div className="qr-inner">
+                {qrMode === 'general' ? (
+                  <>
+                    <h2>QR — {currentTeacher?.subject}</h2>
+                    <p className="qr-sub">
+                      Elevii scanează pentru a marca prezența la <strong>{currentTeacher?.subject}</strong>
+                    </p>
+                    <div className="qr-box">
+                      <QRCodeSVG value={qrBaseUrl} size={220} level="H" />
+                    </div>
+                    <p className="qr-url">{qrBaseUrl}</p>
+                  </>
+                ) : (
+                  <>
+                    <h2>QR per Clasă — {currentTeacher?.subject}</h2>
+                    <p className="qr-sub">Fiecare cod pre-completează clasa automat</p>
+                    <div className="qr-grid">
+                      {ALL_CLASSES.map(cls => (
+                        <div
+                          className="qr-class-item qr-class-item--clickable"
+                          key={cls}
+                          onClick={() => setQrZoom(cls)}
+                          title="Click pentru mărire"
+                        >
+                          <QRCodeSVG
+                            value={`${qrBaseUrl}&clasa=${encodeURIComponent(cls)}`}
+                            size={110}
+                            level="M"
+                          />
+                          <span className="qr-class-label">{cls}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
