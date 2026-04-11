@@ -1,94 +1,91 @@
-  Aplicație web pentru înregistrarea digitală a prezenței elevilor, construită cu React, TypeScript și Firebase Firestore. Profesorii generează coduri QR unice pe care elevii le scanează pentru a-și marca prezența în timp real. 
-                                                                                                                                                                                                                                    
-  ---                                                                                                                                                                                                                               
-  Funcționalități                                                                                                                                                                                                                   
-                                         
-  Pentru elevi
+# Prezență — Liceul Teoretic Ion Pelivan
 
-  - Înregistrare prin QR code — elevul scanează codul QR afișat de profesor și completează un formular simplu (prenume, nume, clasă)
-  - QR pre-completat pe clasă — profesorul poate genera câte un QR separat pentru fiecare clasă, astfel clasa se completează automat
-  - Protecție anti-duplicat — un elev nu poate marca prezența de două ori în aceeași zi la aceeași materie
-  - Mod întunecat — interfață adaptabilă light/dark
+A web application for **digital attendance tracking**, built with React, TypeScript, and Firebase Firestore. Teachers generate unique QR codes that students scan to mark their attendance in real time.
 
-  Pentru profesori (/teacher)
+---
 
-  - Autentificare cu parolă per profesor/materie
-  - Listă prezențe în timp real — se actualizează instant când un elev scanează QR-ul
-  - Filtrare și căutare — după clasă, dată sau numele elevului
-  - Blocare înregistrare — profesorul poate închide sesiunea de prezență cu un singur click; elevii văd un mesaj de blocare
-  - QR Code general sau per clasă — generare și afișare QR direct în dashboard; click pe orice QR îl mărește pentru proiector
-  - Export CSV — descarcă lista de prezențe pentru orice zi, cu antet detaliat
-  - Print — imprimă lista curentă direct din browser
+## Features
 
-  Statistici și rapoarte
+### For students
+- **QR code check-in** — students scan the QR code displayed by the teacher and fill in a simple form (first name, last name, class)
+- **Class-pre-filled QR** — the teacher can generate a separate QR for each class, so the class field is filled in automatically
+- **Anti-duplicate protection** — a student cannot mark attendance twice on the same day for the same subject
+- **Dark mode** — light/dark interface toggle
 
-  - Tab Statistici — grafic vizual cu numărul de elevi prezenți per clasă pentru ziua selectată; carduri cu total, clase reprezentate, clasa cu cei mai mulți elevi
-  - Raport interval — introduce o perioadă (de la → până la) și obții frecvența fiecărui elev în acel interval, plus detaliu pe zile; export CSV cu două secțiuni (frecvență + detaliu)
-  - Raport elev — caută un elev după nume și obții toate prezențele lui la toate materiile, grupate cu carduri per materie și tabel cronologic complet; export CSV
+### For teachers (`/teacher`)
+- **Per-teacher password login** — each teacher/subject has its own password
+- **Real-time attendance list** — updates instantly as students scan the QR code
+- **Filter and search** — by class, date, or student name
+- **Lock attendance** — the teacher can close the session with one click; students see a locked message
+- **General or per-class QR code** — generate and display QR codes directly in the dashboard; clicking any QR enlarges it for the projector
+- **CSV export** — download the attendance list for any day with a detailed header
+- **Print** — print the current list directly from the browser
 
-  Admin panel (/admin)
+### Statistics and reports
+- **Statistics tab** — visual bar chart of students present per class for the selected day; cards showing total, represented classes, and the class with the most attendees
+- **Interval report** — enter a date range and get each student's frequency in that period, plus a day-by-day breakdown; CSV export with two sections (frequency + detail)
+- **Student report** — search a student by name and see all their attendances across **all subjects**, grouped with per-subject summary cards and a full chronological table; CSV export
 
-  - Gestionare profesori — adaugă sau șterge profesori direct din UI, fără a modifica codul; modificările se propagă live în toate paginile deschise
-  - Gestionare clase — adaugă sau șterge clase (inclusiv clase personalizate gen IX-D, X-INFO); se propagă live
-  - Schimbare parolă admin — parolă stocată în Firestore, nu în cod
-  - Reset la valori implicite — un click pentru a reveni la lista de profesori/clase predefinite
+### Admin panel (`/admin`)
+- **Teacher management** — add or delete teachers directly from the UI without touching the code; changes propagate live to all open pages
+- **Class management** — add or delete classes (including custom ones like `IX-D`, `X-INFO`); live propagation
+- **Change admin password** — password stored in Firestore, not in the source code
+- **Reset to defaults** — one click to restore the predefined teacher/class list
 
-  PWA — Instalabil ca aplicație
+### PWA — Installable as an app
+- Can be installed on mobile or desktop directly from the browser (Chrome / Edge / Safari)
+- Runs like a native app — no address bar, icon on the home screen
+- Service worker with static asset caching; Firebase always requires an internet connection
 
-  - Poate fi instalat pe telefon sau desktop direct din browser (Chrome/Edge/Safari)
-  - Funcționează ca aplicație nativă (fără bara de adresă, iconița pe ecranul principal)
-  - Service worker cu cache pentru assets statice; Firebase funcționează întotdeauna online
+---
 
-  ---
-  Tehnologii folosite
+## Tech stack
 
-  ┌─────────────────────────────────┬───────────────────────────┐
-  │           Tehnologie            │            Rol            │
-  ├─────────────────────────────────┼───────────────────────────┤
-  │ React 19 + TypeScript           │ UI și logică frontend     │
-  ├─────────────────────────────────┼───────────────────────────┤
-  │ Firebase Firestore              │ Bază de date în timp real │
-  ├─────────────────────────────────┼───────────────────────────┤
-  │ Vite 8                          │ Build tool                │
-  ├─────────────────────────────────┼───────────────────────────┤
-  │ React Router v7                 │ Navigare între pagini     │
-  ├─────────────────────────────────┼───────────────────────────┤
-  │ qrcode.react                    │ Generare QR code          │
-  ├─────────────────────────────────┼───────────────────────────┤
-  │ PWA (manifest + service worker) │ Instalabilitate           │
-  └─────────────────────────────────┴───────────────────────────┘
+| Technology | Role |
+|---|---|
+| React 19 + TypeScript | UI and frontend logic |
+| Firebase Firestore | Real-time database |
+| Vite 8 | Build tool |
+| React Router v7 | Client-side routing |
+| qrcode.react | QR code generation |
+| PWA (manifest + service worker) | Installability |
 
-  ---
-  Structura proiectului
+---
 
-  src/
-  ├── pages/
-  │   ├── StudentPage.tsx   # Pagina de înregistrare pentru elevi
-  │   ├── TeacherPage.tsx   # Dashboard profesor
-  │   └── AdminPage.tsx     # Panou administrator
-  ├── hooks/
-  │   └── useConfig.ts      # Hook Firestore: profesori și clase dinamice
-  ├── firebase.ts           # Configurare Firebase
-  ├── teachers.ts           # Lista implicită de profesori (fallback)
-  └── types.ts              # Tipuri TypeScript
+## Project structure
 
-  public/
-  ├── manifest.webmanifest  # Config PWA
-  ├── sw.js                 # Service worker
-  └── icon.svg              # Iconița aplicației
+```
+src/
+├── pages/
+│   ├── StudentPage.tsx   # Student check-in page
+│   ├── TeacherPage.tsx   # Teacher dashboard
+│   └── AdminPage.tsx     # Admin panel
+├── hooks/
+│   └── useConfig.ts      # Firestore hook: dynamic teachers and classes
+├── firebase.ts           # Firebase configuration
+├── teachers.ts           # Default teacher list (fallback)
+└── types.ts              # TypeScript types
 
-  ---
-  Cum funcționează
+public/
+├── manifest.webmanifest  # PWA config
+├── sw.js                 # Service worker
+└── icon.svg              # App icon
+```
 
-  1. Administratorul accesează /admin, adaugă profesorii și clasele școlii
-  2. Profesorul accesează /teacher, se autentifică cu parola sa și deschide sesiunea
-  3. Profesorul afișează QR-ul pe proiector (general sau per clasă)
-  4. Elevii scanează QR-ul cu telefonul, completează numele și apasă „Marchează Prezența"
-  5. Profesorul vede lista actualizată în timp real și poate exporta/printa la final
+---
 
-  ---
-  Securitate și date
+## How it works
 
-  - Fiecare înregistrare stochează: prenume, nume, clasă, dată, oră exactă, IP și materie
-  - ID-ul documentului Firestore este determinist (prenume|nume|clasă|dată|materie), garantând unicitatea fără index de bază de date
-  - Profesorii văd doar datele propriei materii în lista zilnică; raportul per elev este disponibil tuturor profesorilor autentificați
+1. The **administrator** goes to `/admin`, adds the school's teachers and classes
+2. The **teacher** goes to `/teacher`, logs in with their password and opens the session
+3. The **teacher** displays the QR code on the projector (general or per-class)
+4. **Students** scan the QR with their phone, enter their name and press "Mark Attendance"
+5. The **teacher** sees the list update in real time and can export or print at the end
+
+---
+
+## Data and security
+
+- Each record stores: first name, last name, class, date, exact time, IP address, and subject
+- The Firestore document ID is deterministic (`firstname|lastname|class|date|subject`), guaranteeing uniqueness without a database index
+- Teachers see only their own subject's data in the daily list; the student report is available to all authenticated teachers

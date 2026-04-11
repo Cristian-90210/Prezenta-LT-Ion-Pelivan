@@ -2,22 +2,16 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Timestamp, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { TEACHERS } from '../teachers';
-
-const ALL_CLASSES_V_IX = ['V', 'VI', 'VII', 'VIII', 'IX'].flatMap(cls =>
-  ['A', 'B', 'C'].map(lit => `${cls}-${lit}`)
-);
-const ALL_CLASSES_X_XII = ['X', 'XI', 'XII'].flatMap(cls =>
-  ['REAL', 'UMAN'].map(profil => `${cls}-${profil}`)
-);
+import { useConfig } from '../hooks/useConfig';
 
 type Step = 'form' | 'success' | 'error';
 
 export default function StudentPage() {
+  const { teachers, classes } = useConfig();
   const [searchParams] = useSearchParams();
   const clasaFromUrl = searchParams.get('clasa') ?? '';
   const materieId = searchParams.get('materie') ?? '';
-  const teacher = TEACHERS.find(t => t.id === materieId) ?? null;
+  const teacher = teachers.find(t => t.id === materieId) ?? null;
 
   const [prenume, setPrenume] = useState('');
   const [nume, setNume] = useState('');
@@ -248,12 +242,30 @@ export default function StudentPage() {
               <label htmlFor="clasa">Clasa</label>
               <select id="clasa" value={clasa} onChange={e => setClasa(e.target.value)} disabled={loading}>
                 <option value="">— Alege clasa —</option>
-                <optgroup label="Clasele V–IX">
-                  {ALL_CLASSES_V_IX.map(c => <option key={c} value={c}>{c}</option>)}
-                </optgroup>
-                <optgroup label="Clasele X–XII">
-                  {ALL_CLASSES_X_XII.map(c => <option key={c} value={c}>{c}</option>)}
-                </optgroup>
+                {(() => {
+                  const gimnaziu = classes.filter(c => /^(V|VI|VII|VIII|IX)-/.test(c));
+                  const liceu = classes.filter(c => /^(X|XI|XII)-/.test(c));
+                  const altele = classes.filter(c => !gimnaziu.includes(c) && !liceu.includes(c));
+                  return (
+                    <>
+                      {gimnaziu.length > 0 && (
+                        <optgroup label="Clasele V–IX">
+                          {gimnaziu.map(c => <option key={c} value={c}>{c}</option>)}
+                        </optgroup>
+                      )}
+                      {liceu.length > 0 && (
+                        <optgroup label="Clasele X–XII">
+                          {liceu.map(c => <option key={c} value={c}>{c}</option>)}
+                        </optgroup>
+                      )}
+                      {altele.length > 0 && (
+                        <optgroup label="Altele">
+                          {altele.map(c => <option key={c} value={c}>{c}</option>)}
+                        </optgroup>
+                      )}
+                    </>
+                  );
+                })()}
               </select>
             </div>
           )}

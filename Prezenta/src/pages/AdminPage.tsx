@@ -1,0 +1,429 @@
+import { useState, useEffect } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { TEACHERS, type Teacher } from '../teachers';
+import { useConfig, DEFAULT_CLASSES } from '../hooks/useConfig';
+
+type AdminTab = 'profesori' | 'clase' | 'setari';
+
+function normalizeId(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+export default function AdminPage() {
+  const { teachers, classes } = useConfig();
+
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [adminPass, setAdminPass] = useState<string | null>(null); // null = loading
+
+  const [tab, setTab] = useState<AdminTab>('profesori');
+  const [saving, setSaving] = useState(false);
+
+  // Add teacher form
+  const [newName, setNewName] = useState('');
+  const [newSubject, setNewSubject] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [addTeacherError, setAddTeacherError] = useState('');
+
+  // Add class form
+  const [newClass, setNewClass] = useState('');
+  const [addClassError, setAddClassError] = useState('');
+
+  // Change admin password
+  const [newAdminPass, setNewAdminPass] = useState('');
+  const [passMsg, setPassMsg] = useState('');
+
+  // Dark mode
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('darkMode', String(darkMode));
+  }, [darkMode]);
+
+  // Load admin password from Firestore
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'admin'))
+      .then(snap => {
+        setAdminPass(snap.exists() && snap.data().password ? snap.data().password : 'admin2025');
+      })
+      .catch(() => setAdminPass('admin2025'));
+  }, []);
+
+  function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (adminPass === null) return;
+    if (password === adminPass) {
+      setLoggedIn(true);
+      setLoginError('');
+    } else {
+      setLoginError('Parolă admin incorectă.');
+    }
+  }
+
+  async function saveTeachers(updated: Teacher[]) {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'config'), { teachers: updated }, { merge: true });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveClasses(updated: string[]) {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'config'), { classes: updated }, { merge: true });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleAddTeacher(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    const subject = newSubject.trim();
+    const pass = newPassword.trim();
+    if (!name || !subject || !pass) {
+      setAddTeacherError('Toate câmpurile sunt obligatorii.');
+      return;
+    }
+    const id = normalizeId(subject);
+    if (teachers.some(t => t.id === id)) {
+      setAddTeacherError(`ID-ul "${id}" există deja. Folosiți o materie diferită sau mai specifică.`);
+      return;
+    }
+    setAddTeacherError('');
+    await saveTeachers([...teachers, { id, name, subject, password: pass }]);
+    setNewName('');
+    setNewSubject('');
+    setNewPassword('');
+  }
+
+  async function handleDeleteTeacher(id: string) {
+    await saveTeachers(teachers.filter(t => t.id !== id));
+  }
+
+  async function handleAddClass(e: React.FormEvent) {
+    e.preventDefault();
+    const cls = newClass.trim().toUpperCase();
+    if (!cls) { setAddClassError('Introduceți o clasă.'); return; }
+    if (classes.includes(cls)) { setAddClassError('Clasa există deja.'); return; }
+    setAddClassError('');
+    await saveClasses([...classes, cls]);
+    setNewClass('');
+  }
+
+  async function handleDeleteClass(cls: string) {
+    await saveClasses(classes.filter(c => c !== cls));
+  }
+
+  async function handleChangeAdminPass(e: React.FormEvent) {
+    e.preventDefault();
+    const p = newAdminPass.trim();
+    if (p.length < 6) { setPassMsg('Parola trebuie să aibă cel puțin 6 caractere.'); return; }
+    try {
+      await setDoc(doc(db, 'settings', 'admin'), { password: p });
+      setAdminPass(p);
+      setNewAdminPass('');
+      setPassMsg('✓ Parola a fost schimbată cu succes!');
+    } catch {
+      setPassMsg('Eroare la salvare. Încearcă din nou.');
+    }
+  }
+
+  // ── Login ─────────────────────────────────────────────────────────────────
+  if (!loggedIn) {
+    return (
+      <div className="page-center">
+        <div className="card">
+          <div className="card-header" style={{ background: '#7c3aed' }}>
+            <div className="school-icon">🛡️</div>
+            <h1>Panou Administrator</h1>
+            <p className="subtitle">Acces restricționat</p>
+          </div>
+          <form onSubmit={handleLogin} className="form">
+            <div className="field">
+              <label htmlFor="admin-pass">Parolă administrator</label>
+              <input
+                id="admin-pass"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Parola admin"
+                autoFocus
+                disabled={adminPass === null}
+              />
+            </div>
+            {loginError && <p className="error-msg">{loginError}</p>}
+            <button
+              type="submit"
+              className="btn-primary"
+              style={{ background: '#7c3aed' }}
+              disabled={adminPass === null}
+            >
+              {adminPass === null ? 'Se încarcă...' : 'Intră'}
+            </button>
+          </form>
+          <div style={{ padding: '0 28px 16px', textAlign: 'right' }}>
+            <button className="btn-dark-toggle" onClick={() => setDarkMode(d => !d)}>
+              {darkMode ? '☀ Mod luminos' : '🌙 Mod întunecat'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+  return (
+    <div className="teacher-page">
+      <header className="teacher-header" style={{ background: '#7c3aed' }}>
+        <div className="header-content">
+          <div className="header-title">
+            <h1>🛡️ Panou Administrator</h1>
+            <span className="header-teacher-name">Gestionare profesori, clase &amp; setări</span>
+          </div>
+          <div className="header-actions">
+            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>
+              {darkMode ? '☀' : '🌙'}
+            </button>
+            <button className="btn-outline" onClick={() => setLoggedIn(false)}>Ieșire</button>
+          </div>
+        </div>
+        <div className="dash-tabs">
+          {(['profesori', 'clase', 'setari'] as AdminTab[]).map(t => (
+            <button
+              key={t}
+              className={`dash-tab${tab === t ? ' active' : ''}`}
+              onClick={() => setTab(t)}
+            >
+              {t === 'profesori' ? 'Profesori' : t === 'clase' ? 'Clase' : 'Setări'}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <main className="teacher-main">
+
+        {/* ══ Tab: Profesori ══ */}
+        {tab === 'profesori' && (
+          <>
+            <div className="controls">
+              <h3 className="admin-section-title">Adaugă profesor nou</h3>
+              <form onSubmit={handleAddTeacher}>
+                <div className="control-row">
+                  <div className="field">
+                    <label>Nume afișat</label>
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      placeholder="ex: Prof. Matematică"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Materia predată</label>
+                    <input
+                      type="text"
+                      value={newSubject}
+                      onChange={e => setNewSubject(e.target.value)}
+                      placeholder="ex: Matematică"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Parolă profesor</label>
+                    <input
+                      type="text"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="ex: mate2025"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="field field-btn">
+                    <label>&nbsp;</label>
+                    <button
+                      type="submit"
+                      className="btn-search"
+                      style={{ background: '#7c3aed' }}
+                      disabled={saving}
+                    >
+                      {saving ? 'Se salvează...' : '+ Adaugă'}
+                    </button>
+                  </div>
+                </div>
+                {addTeacherError && (
+                  <p className="error-msg" style={{ marginTop: 8 }}>{addTeacherError}</p>
+                )}
+              </form>
+            </div>
+
+            <div className="attendance-table-wrap">
+              <div className="istoric-result-header">
+                <strong>Profesori activi — {teachers.length} total</strong>
+                <button
+                  className="btn-action"
+                  onClick={() => saveTeachers(TEACHERS)}
+                  disabled={saving}
+                >
+                  Resetează la implicite
+                </button>
+              </div>
+              <table className="attendance-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nume afișat</th>
+                    <th>Materie</th>
+                    <th>Parolă</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teachers.map(t => (
+                    <tr key={t.id}>
+                      <td className="td-ip">{t.id}</td>
+                      <td>{t.name}</td>
+                      <td><span className="badge">{t.subject}</span></td>
+                      <td className="td-ip">{t.password}</td>
+                      <td>
+                        <button
+                          className="btn-delete"
+                          onClick={() => handleDeleteTeacher(t.id)}
+                          disabled={saving}
+                          title="Șterge profesor"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* ══ Tab: Clase ══ */}
+        {tab === 'clase' && (
+          <>
+            <div className="controls">
+              <h3 className="admin-section-title">Adaugă clasă nouă</h3>
+              <form onSubmit={handleAddClass}>
+                <div className="control-row">
+                  <div className="field">
+                    <label>Denumire clasă (ex: IX-D, X-INFO)</label>
+                    <input
+                      type="text"
+                      value={newClass}
+                      onChange={e => setNewClass(e.target.value)}
+                      placeholder="ex: IX-D"
+                      disabled={saving}
+                    />
+                  </div>
+                  <div className="field field-btn">
+                    <label>&nbsp;</label>
+                    <button
+                      type="submit"
+                      className="btn-search"
+                      style={{ background: '#7c3aed' }}
+                      disabled={saving}
+                    >
+                      {saving ? 'Se salvează...' : '+ Adaugă clasă'}
+                    </button>
+                  </div>
+                </div>
+                {addClassError && (
+                  <p className="error-msg" style={{ marginTop: 8 }}>{addClassError}</p>
+                )}
+              </form>
+            </div>
+
+            <div className="attendance-table-wrap">
+              <div className="istoric-result-header">
+                <strong>Clase active — {classes.length} total</strong>
+                <button
+                  className="btn-action"
+                  onClick={() => saveClasses(DEFAULT_CLASSES)}
+                  disabled={saving}
+                >
+                  Resetează la implicite
+                </button>
+              </div>
+              <div className="admin-classes-grid">
+                {classes.map(cls => (
+                  <div className="admin-class-tag" key={cls}>
+                    <span className="badge">{cls}</span>
+                    <button
+                      className="admin-class-delete"
+                      onClick={() => handleDeleteClass(cls)}
+                      disabled={saving}
+                      title={`Șterge ${cls}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ══ Tab: Setări ══ */}
+        {tab === 'setari' && (
+          <div className="controls">
+            <h3 className="admin-section-title">Schimbă parola administrator</h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+              Parola implicită este{' '}
+              <code style={{ background: 'var(--gray-100)', padding: '2px 6px', borderRadius: 4 }}>
+                admin2025
+              </code>
+              . Schimbați-o la prima autentificare.
+            </p>
+            <form onSubmit={handleChangeAdminPass}>
+              <div className="control-row">
+                <div className="field">
+                  <label>Parolă nouă (min. 6 caractere)</label>
+                  <input
+                    type="password"
+                    value={newAdminPass}
+                    onChange={e => setNewAdminPass(e.target.value)}
+                    placeholder="Parolă nouă"
+                  />
+                </div>
+                <div className="field field-btn">
+                  <label>&nbsp;</label>
+                  <button
+                    type="submit"
+                    className="btn-search"
+                    style={{ background: '#7c3aed' }}
+                  >
+                    Schimbă parola
+                  </button>
+                </div>
+              </div>
+              {passMsg && (
+                <p
+                  className={passMsg.startsWith('✓') ? 'success-msg' : 'error-msg'}
+                  style={{ marginTop: 8 }}
+                >
+                  {passMsg}
+                </p>
+              )}
+            </form>
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}

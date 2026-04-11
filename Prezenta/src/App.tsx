@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import StudentPage from './pages/StudentPage';
 import TeacherPage from './pages/TeacherPage';
+import AdminPage from './pages/AdminPage';
 import './App.css';
 
 export default function App() {
@@ -9,6 +10,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<StudentPage />} />
         <Route path="/teacher" element={<TeacherPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </BrowserRouter>
   );
