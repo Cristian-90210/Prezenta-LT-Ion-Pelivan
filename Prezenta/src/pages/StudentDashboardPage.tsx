@@ -55,7 +55,9 @@ export default function StudentDashboardPage() {
   const [recordsLoading, setRecordsLoading] = useState(true);
 
   const [regState, setRegState]       = useState<RegState>('idle');
-  const [dashTab, setDashTab]         = useState<StudentTab>('scan');
+  const [dashTab, setDashTab]         = useState<StudentTab>(
+    () => (localStorage.getItem('studentTab') as StudentTab) ?? 'scan',
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const scannerRef = useRef<any>(null);
@@ -78,7 +80,7 @@ export default function StudentDashboardPage() {
     localStorage.setItem('darkMode', String(darkMode));
   }, [darkMode]);
 
-  // Când vine un QR param, mergi automat pe tab-ul scan
+  // Când vine un QR param, forțează tab-ul scan (fără a suprascrie localStorage)
   useEffect(() => {
     if (materieId) setDashTab('scan');
   }, [materieId]);
@@ -267,6 +269,7 @@ export default function StudentDashboardPage() {
 
   function goTab(tab: StudentTab) {
     setDashTab(tab);
+    localStorage.setItem('studentTab', tab);
     setSidebarOpen(false);
   }
 

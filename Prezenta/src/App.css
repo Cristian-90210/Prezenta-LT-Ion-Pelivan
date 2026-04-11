@@ -412,6 +412,17 @@ html, body, #root {
 }
 .btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ── PDF button ── */
+.btn-pdf {
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+.btn-pdf:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
 /* ── Search button ── */
 .field-btn { justify-content: flex-end; }
 .btn-search {
