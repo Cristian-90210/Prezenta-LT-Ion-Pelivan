@@ -1491,6 +1491,182 @@ html, body, #root {
 .sidebar-lock-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ══════════════════════════════════════════
+   FIELD HINT & BTN PREZENTA MEA
+══════════════════════════════════════════ */
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 5px;
+  display: block;
+}
+
+.btn-prezenta-mea {
+  display: inline-block;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 999px;
+  padding: 13px 28px;
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.15s;
+  letter-spacing: -0.01em;
+  box-shadow: 0 4px 18px hsla(238,75%,58%,0.35);
+}
+.btn-prezenta-mea:hover { opacity: 0.88; transform: translateY(-1px); }
+
+/* ══════════════════════════════════════════
+   PREZENTA MEA PAGE
+══════════════════════════════════════════ */
+.pm-container {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.pm-header-card {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 28px 28px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: #fff;
+  flex-wrap: wrap;
+}
+.pm-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 900;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.4);
+}
+.pm-identity { flex: 1; min-width: 0; }
+.pm-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+  color: #fff;
+}
+.pm-meta { font-size: 0.82rem; opacity: 0.82; word-break: break-all; }
+.pm-total-badge {
+  background: rgba(255,255,255,0.22);
+  border: 1.5px solid rgba(255,255,255,0.4);
+  border-radius: 999px;
+  padding: 6px 18px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pm-section-title {
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 14px 24px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--border);
+}
+
+.pm-subjects {
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pm-subject-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pm-subject-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  width: 130px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pm-subject-bar-track {
+  flex: 1;
+  background: var(--gray-100);
+  border-radius: 999px;
+  height: 20px;
+  overflow: hidden;
+}
+.pm-subject-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+  border-radius: 999px;
+  min-width: 4px;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pm-subject-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--indigo);
+  white-space: nowrap;
+  width: 56px;
+  text-align: right;
+}
+
+.pm-records {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  display: flex;
+  flex-direction: column;
+}
+.pm-record-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--gray-100);
+  transition: background 0.1s;
+}
+.pm-record-row:last-child { border-bottom: none; }
+.pm-record-row:hover { background: var(--indigo-light); }
+.pm-record-date {
+  font-size: 0.875rem;
+  color: var(--text);
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+.pm-record-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.pm-record-time {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+/* Border-radius for last element */
+.pm-records { border-radius: 0 0 var(--radius) var(--radius); }
+
+/* ══════════════════════════════════════════
    PRINT
 ══════════════════════════════════════════ */
 @media print {

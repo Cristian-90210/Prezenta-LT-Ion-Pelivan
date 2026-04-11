@@ -7,4 +7,5 @@ export interface AttendanceRecord {
   data: string;
   ip?: string;
   materie?: string;
+  email?: string;
 }
