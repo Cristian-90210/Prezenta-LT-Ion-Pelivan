@@ -1065,6 +1065,41 @@ html, body, #root {
 /* ══════════════════════════════════════════
    QR MODAL
 ══════════════════════════════════════════ */
+.qr-back-btn {
+  background: none;
+  border: none;
+  color: var(--indigo);
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.qr-back-btn:hover { background: var(--indigo-light); }
+
+.qr-zoom-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0 8px;
+  animation: slideUp 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.qr-zoom-inline-title {
+  font-size: 1.1rem;
+  color: var(--text);
+  font-weight: 600;
+  text-align: center;
+}
+.qr-box--zoomed {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
 .qr-modal-box {
   background: var(--surface);
   border-radius: var(--radius);
