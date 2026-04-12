@@ -695,21 +695,13 @@ export default function TeacherPage() {
 
       <header className="teacher-header">
         <div className="header-content">
-          <div className="header-title">
-            <h1>👩‍🏫 {currentTeacher?.subject}</h1>
-            <span className="header-teacher-name">{currentTeacher?.name}</span>
+          <button className="btn-hamburger" onClick={() => setSidebarOpen(true)} aria-label="Meniu">☰</button>
+
+          <div className="header-center-title">
+            <span className="hct-subject">{currentTeacher?.subject}</span>
+            <span className="hct-school">LT Ion Pelivan</span>
           </div>
 
-          {/* Hamburger — doar mobil */}
-          <button
-            className="btn-hamburger"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Deschide meniu"
-          >
-            ☰
-          </button>
-
-          {/* Acțiuni — doar desktop */}
           <div className="header-actions header-actions-desktop">
             <button
               className={`btn-lock${locked ? ' locked' : ''}`}
@@ -722,30 +714,68 @@ export default function TeacherPage() {
             <button className="btn-secondary" onClick={() => setQrVisible(v => !v)}>
               {qrVisible ? 'Ascunde QR' : '📱 QR'}
             </button>
-            <button
-              className="btn-outline"
-              onClick={() => setDarkMode(d => !d)}
-              title="Mod întunecat"
-            >
-              {darkMode ? '☀' : '🌙'}
-            </button>
+            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>{darkMode ? '☀' : '🌙'}</button>
             <button className="btn-outline" onClick={handleLogout}>Ieșire</button>
           </div>
         </div>
-        <div className="dash-tabs">
-          {TAB_ITEMS.map(item => (
-            <button
-              key={item.id}
-              className={`dash-tab${dashTab === item.id ? ' active' : ''}`}
-              onClick={() => setDashTab(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
       </header>
 
-      <main className="teacher-main">
+      <div className="teacher-body">
+
+        {/* ══ SIDEBAR PERMANENT (desktop) ══ */}
+        <aside className="teacher-sidebar-fixed">
+          <div className="tsf-profile">
+            <div className="tsf-avatar">{currentTeacher?.name?.charAt(0).toUpperCase() ?? '👩'}</div>
+            <div className="tsf-info">
+              <span className="tsf-name">{currentTeacher?.name}</span>
+              <span className="tsf-badge">Profesor</span>
+            </div>
+          </div>
+
+          <nav className="tsf-nav">
+            {TAB_ITEMS.map(item => (
+              <button
+                key={item.id}
+                className={`tsf-nav-item${dashTab === item.id ? ' active' : ''}`}
+                onClick={() => setDashTab(item.id)}
+              >
+                <span className="tsf-nav-icon">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="tsf-footer">
+            <div className="sidebar-lock-row">
+              <span className="sidebar-lock-label">
+                {locked ? '🔒 Blocat' : '🔓 Activ'}
+              </span>
+              <button
+                className={`sidebar-lock-btn${locked ? ' locked' : ''}`}
+                onClick={handleToggleLock}
+                disabled={lockLoading}
+              >
+                {locked ? 'Deschide' : 'Blochează'}
+              </button>
+            </div>
+            <button
+              className="tsf-action-btn"
+              onClick={() => setQrVisible(v => !v)}
+            >
+              📱 {qrVisible ? 'Ascunde QR' : 'Afișează QR'}
+            </button>
+            <div className="sidebar-toggle-row">
+              <span className="sidebar-toggle-label">🌙 Mod întunecat</span>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={darkMode} onChange={() => setDarkMode(d => !d)} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+            <button className="sidebar-logout" onClick={handleLogout}>↩ Deconectare</button>
+          </div>
+        </aside>
+
+        <main className="teacher-main">
 
         {/* ── Edit Modal ── */}
         {editingRecord && (
@@ -1295,6 +1325,7 @@ export default function TeacherPage() {
           </>
         )}
       </main>
+      </div>
     </div>
   );
 }
