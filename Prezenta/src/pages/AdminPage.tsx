@@ -57,6 +57,9 @@ export default function AdminPage() {
   const [resetMsg, setResetMsg] = useState<Record<string, string>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  // Mobile sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   // Dark mode
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   useEffect(() => {
@@ -241,41 +244,108 @@ export default function AdminPage() {
     );
   }
 
+  const ADMIN_TABS: { id: AdminTab; icon: string; label: string }[] = [
+    { id: 'profesori', icon: '👩‍🏫', label: 'Profesori' },
+    { id: 'clase',     icon: '🏫', label: 'Clase' },
+    { id: 'elevi',     icon: '👨‍🎓', label: 'Elevi' },
+    { id: 'setari',    icon: '⚙️', label: 'Setări' },
+  ];
+
   // ── Dashboard ─────────────────────────────────────────────────────────────
   return (
     <div className="teacher-page">
-      <header className="teacher-header" style={{ background: '#7c3aed' }}>
-        <div className="header-content">
-          <div className="header-title">
-            <h1>🛡️ Panou Administrator</h1>
-            <span className="header-teacher-name">Gestionare profesori, clase &amp; setări</span>
+
+      {/* ══════════ MOBILE SIDEBAR ══════════ */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}>
+          <div className="sidebar" onClick={e => e.stopPropagation()}>
+            <div className="sidebar-header">
+              <span className="sidebar-logo">🛡️ Administrator</span>
+              <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
+            </div>
+            <nav className="sidebar-nav">
+              {ADMIN_TABS.map(item => (
+                <button
+                  key={item.id}
+                  className={`sidebar-nav-item${tab === item.id ? ' active' : ''}`}
+                  onClick={() => { setTab(item.id); setSidebarOpen(false); }}
+                >
+                  <span className="sidebar-nav-icon">{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+            <div className="sidebar-footer">
+              <div className="sidebar-toggle-row">
+                <span className="sidebar-toggle-label">🌙 Mod întunecat</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={darkMode} onChange={() => setDarkMode(d => !d)} />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              <button className="sidebar-logout" onClick={() => { setLoggedIn(false); setSidebarOpen(false); }}>
+                ↩ Deconectare
+              </button>
+            </div>
           </div>
-          <div className="header-actions">
-            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>
-              {darkMode ? '☀' : '🌙'}
-            </button>
+        </div>
+      )}
+      {/* ══════════ END SIDEBAR ══════════ */}
+
+      <header className="teacher-header" style={{ background: 'linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%)' }}>
+        <div className="header-content">
+          <button className="btn-hamburger" onClick={() => setSidebarOpen(true)} aria-label="Meniu">☰</button>
+
+          <div className="header-center-title">
+            <span className="hct-subject">Administrator</span>
+            <span className="hct-school">LT Ion Pelivan</span>
+          </div>
+
+          <div className="header-actions header-actions-desktop">
+            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>{darkMode ? '☀' : '🌙'}</button>
             <button className="btn-outline" onClick={() => setLoggedIn(false)}>Ieșire</button>
           </div>
         </div>
-        <div className="dash-tabs">
-          {([
-            ['profesori', 'Profesori'],
-            ['clase',     'Clase'],
-            ['elevi',     'Elevi'],
-            ['setari',    'Setări'],
-          ] as [AdminTab, string][]).map(([id, label]) => (
-            <button
-              key={id}
-              className={`dash-tab${tab === id ? ' active' : ''}`}
-              onClick={() => setTab(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       </header>
 
-      <main className="teacher-main">
+      <div className="teacher-body">
+
+        {/* ══ SIDEBAR PERMANENT (desktop) ══ */}
+        <aside className="teacher-sidebar-fixed">
+          <div className="tsf-profile">
+            <div className="tsf-avatar">🛡</div>
+            <div className="tsf-info">
+              <span className="tsf-name">Administrator</span>
+              <span className="tsf-badge" style={{ color: '#7c3aed', background: '#ede9fe' }}>Admin</span>
+            </div>
+          </div>
+
+          <nav className="tsf-nav">
+            {ADMIN_TABS.map(item => (
+              <button
+                key={item.id}
+                className={`tsf-nav-item${tab === item.id ? ' active' : ''}`}
+                onClick={() => setTab(item.id)}
+              >
+                <span className="tsf-nav-icon">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="tsf-footer">
+            <div className="sidebar-toggle-row">
+              <span className="sidebar-toggle-label">🌙 Mod întunecat</span>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={darkMode} onChange={() => setDarkMode(d => !d)} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+            <button className="sidebar-logout" onClick={() => setLoggedIn(false)}>↩ Deconectare</button>
+          </div>
+        </aside>
+
+        <main className="teacher-main">
 
         {/* ══ Tab: Profesori ══ */}
         {tab === 'profesori' && (
@@ -636,6 +706,7 @@ export default function AdminPage() {
         )}
 
       </main>
+      </div>
     </div>
   );
 }

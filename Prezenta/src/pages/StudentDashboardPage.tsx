@@ -350,99 +350,80 @@ export default function StudentDashboardPage() {
           <button className="btn-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
           {!isOnline && <span className="offline-badge">Offline</span>}
 
-          <div className="header-title">
-            <span className="school-icon-sm">🎓</span>
-            <div>
-              <h1>Prezență</h1>
-              <span className="header-teacher-name">LT Ion Pelivan</span>
-            </div>
+          <div className="header-center-title">
+            <span className="hct-subject">Prezență</span>
+            <span className="hct-school">LT Ion Pelivan</span>
           </div>
 
-          {/* Tab-uri desktop */}
-          <nav className="dash-tabs header-actions-desktop">
+          <div className="header-actions header-actions-desktop">
+            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>{darkMode ? '☀' : '🌙'}</button>
+            <button className="btn-outline" onClick={() => signOut(auth)}>↩ Ieșire</button>
+          </div>
+        </div>
+      </header>
+
+      <div className="teacher-body">
+
+        {/* ══ SIDEBAR PERMANENT (desktop) ══ */}
+        <aside className="teacher-sidebar-fixed">
+          {profile && (
+            <div className="tsf-profile">
+              <div className="tsf-avatar">{profile.prenume.charAt(0).toUpperCase()}</div>
+              <div className="tsf-info">
+                <span className="tsf-name">{profile.prenume} {profile.nume}</span>
+                <span className="tsf-badge">Clasa {profile.clasa}</span>
+              </div>
+            </div>
+          )}
+
+          <nav className="tsf-nav">
             {TAB_ITEMS.map(item => (
               <button
                 key={item.id}
-                className={`dash-tab${dashTab === item.id ? ' active' : ''}`}
+                className={`tsf-nav-item${dashTab === item.id ? ' active' : ''}`}
                 onClick={() => goTab(item.id)}
               >
-                {item.icon} {item.label}
+                <span className="tsf-nav-icon">{item.icon}</span>
+                {item.label}
               </button>
             ))}
           </nav>
 
-          {/* Acțiuni dreapta desktop */}
-          <div className="header-actions-desktop" style={{ gap: 8, display: 'flex', alignItems: 'center' }}>
-            {profile && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 4 }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: '50%',
-                  background: 'rgba(255,255,255,0.22)', border: '2px solid rgba(255,255,255,0.4)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.9rem', fontWeight: 800, color: '#fff', flexShrink: 0,
-                }}>
-                  {profile.prenume.charAt(0).toUpperCase()}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>
-                    {profile.prenume} {profile.nume}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.72)' }}>
-                    Clasa {profile.clasa}
-                  </span>
-                </div>
-              </div>
-            )}
-            <button className="btn-dark-toggle" onClick={() => setDarkMode(d => !d)} title="Schimbă tema">
-              {darkMode ? '☀' : '🌙'}
-            </button>
+          <div className="tsf-footer">
+            <div className="sidebar-toggle-row">
+              <span className="sidebar-toggle-label">🌙 Mod întunecat</span>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={darkMode} onChange={() => setDarkMode(d => !d)} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+            <button className="sidebar-logout" onClick={() => signOut(auth)}>↩ Deconectare</button>
+          </div>
+        </aside>
+
+        {/* ── Conținut principal ── */}
+        <main className="teacher-main" style={{ paddingTop: 24 }}>
+
+        {/* ── Banner email neverificat ── */}
+        {user && !user.emailVerified && (
+          <div className="alert-banner alert-banner--warning">
+            <span>📧 Verifică-ți adresa de email <strong>{user.email}</strong>. Caută emailul de la Firebase.</span>
             <button
-              className="btn-secondary"
-              onClick={() => signOut(auth)}
-              style={{ fontSize: '0.82rem', padding: '7px 14px' }}
+              className="alert-banner-btn"
+              onClick={handleResendVerification}
+              disabled={verifLoading || verifSent}
             >
-              ↩ Ieșire
+              {verifSent ? '✓ Trimis!' : verifLoading ? 'Se trimite...' : 'Retrimite'}
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Tab-uri mobile (sub header) */}
-        <div className="dash-tabs" style={{ borderTop: '1px solid rgba(255,255,255,0.15)' }}>
-          {TAB_ITEMS.map(item => (
-            <button
-              key={item.id}
-              className={`dash-tab${dashTab === item.id ? ' active' : ''}`}
-              onClick={() => goTab(item.id)}
-            >
-              {item.icon} {item.label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* ── Banner email neverificat ── */}
-      {user && !user.emailVerified && (
-        <div className="alert-banner alert-banner--warning">
-          <span>📧 Verifică-ți adresa de email <strong>{user.email}</strong>. Caută emailul de la Firebase.</span>
-          <button
-            className="alert-banner-btn"
-            onClick={handleResendVerification}
-            disabled={verifLoading || verifSent}
-          >
-            {verifSent ? '✓ Trimis!' : verifLoading ? 'Se trimite...' : 'Retrimite'}
-          </button>
-        </div>
-      )}
-
-      {/* ── Banner offline ── */}
-      {!isOnline && (
-        <div className="alert-banner alert-banner--offline">
-          <span>📵 Ești offline. Prezențele se salvează local și se sincronizează automat când revine conexiunea.</span>
-        </div>
-      )}
-
-      {/* ── Conținut principal ── */}
-      <main className="teacher-main" style={{ paddingTop: 24 }}>
+        {/* ── Banner offline ── */}
+        {!isOnline && (
+          <div className="alert-banner alert-banner--offline">
+            <span>📵 Ești offline. Prezențele se salvează local și se sincronizează automat când revine conexiunea.</span>
+          </div>
+        )}
 
         {/* ══ TAB: Scanează QR ══ */}
         {dashTab === 'scan' && (
@@ -705,7 +686,8 @@ export default function StudentDashboardPage() {
             </button>
           </div>
         )}
-      </main>
+        </main>
+      </div>
 
       {/* ── Scanner modal ── */}
       {scannerOpen && (
