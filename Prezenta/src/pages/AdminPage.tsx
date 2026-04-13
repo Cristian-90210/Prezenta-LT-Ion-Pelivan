@@ -27,7 +27,17 @@ function normalizeId(s: string): string {
 export default function AdminPage() {
   const { teachers, classes } = useConfig();
 
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(() => {
+    const t = sessionStorage.getItem('adminLoginTime');
+    if (!t) return false;
+    const remaining = 10 * 60 * 1000 - (Date.now() - Number(t));
+    if (remaining <= 0) {
+      sessionStorage.removeItem('adminLoginTime');
+      sessionStorage.removeItem('adminLoggedIn');
+      return false;
+    }
+    return sessionStorage.getItem('adminLoggedIn') === 'true';
+  });
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [adminPass, setAdminPass] = useState<string | null>(null); // null = loading
@@ -90,6 +100,7 @@ export default function AdminPage() {
 
   function handleAdminLogout() {
     sessionStorage.removeItem('adminLoginTime');
+    sessionStorage.removeItem('adminLoggedIn');
     setLoggedIn(false);
     setSidebarOpen(false);
   }
@@ -98,9 +109,8 @@ export default function AdminPage() {
     e.preventDefault();
     if (adminPass === null) return;
     if (password === adminPass) {
-      if (!sessionStorage.getItem('adminLoginTime')) {
-        sessionStorage.setItem('adminLoginTime', String(Date.now()));
-      }
+      sessionStorage.setItem('adminLoginTime', String(Date.now()));
+      sessionStorage.setItem('adminLoggedIn', 'true');
       setLoggedIn(true);
       setLoginError('');
     } else {
@@ -316,15 +326,9 @@ export default function AdminPage() {
       <header className="teacher-header" style={{ background: 'linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%)' }}>
         <div className="header-content">
           <button className="btn-hamburger" onClick={() => setSidebarOpen(true)} aria-label="Meniu">☰</button>
-
           <div className="header-center-title">
             <span className="hct-subject">Administrator</span>
             <span className="hct-school">LT Ion Pelivan</span>
-          </div>
-
-          <div className="header-actions header-actions-desktop">
-            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>{darkMode ? '☀' : '🌙'}</button>
-            <button className="btn-outline" onClick={handleAdminLogout}>Ieșire</button>
           </div>
         </div>
       </header>

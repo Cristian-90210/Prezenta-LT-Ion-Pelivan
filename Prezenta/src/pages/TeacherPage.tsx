@@ -9,7 +9,26 @@ import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
 import type { AttendanceRecord } from '../types';
 import { useConfig } from '../hooks/useConfig';
-import type { Teacher } from '../teachers';
+import { TEACHERS, type Teacher } from '../teachers';
+
+// ── Helpers sesiune profesor ───────────────────────────────────────────────────
+function sessionIsValid(key: string): boolean {
+  const t = sessionStorage.getItem(key);
+  if (!t) return false;
+  return 10 * 60 * 1000 - (Date.now() - Number(t)) > 0;
+}
+
+function getStoredTeacher(): Teacher | null {
+  if (!sessionIsValid('teacherLoginTime')) return null;
+  const id = sessionStorage.getItem('teacherId');
+  if (!id) return null;
+  // Încearcă întâi varianta serializată (poate conține date Firestore actualizate)
+  const raw = sessionStorage.getItem('teacherObj');
+  if (raw) {
+    try { return JSON.parse(raw) as Teacher; } catch {}
+  }
+  return TEACHERS.find(t => t.id === id) ?? null;
+}
 import { exportXlsx } from '../utils/exportXlsx';
 
 type View = 'login' | 'dashboard';
@@ -17,10 +36,12 @@ type DashTab = 'lista' | 'statistici' | 'raport' | 'istoric';
 
 export default function TeacherPage() {
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const [view, setView] = useState<View>('login');
+  const [view, setView] = useState<View>(() =>
+    getStoredTeacher() ? 'dashboard' : 'login'
+  );
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(null);
+  const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(getStoredTeacher);
 
   // ── Dark mode ─────────────────────────────────────────────────────────────
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
@@ -153,9 +174,9 @@ export default function TeacherPage() {
     e.preventDefault();
     const teacher = teachers.find(t => t.password === password);
     if (teacher) {
-      if (!sessionStorage.getItem('teacherLoginTime')) {
-        sessionStorage.setItem('teacherLoginTime', String(Date.now()));
-      }
+      sessionStorage.setItem('teacherLoginTime', String(Date.now()));
+      sessionStorage.setItem('teacherId', teacher.id);
+      sessionStorage.setItem('teacherObj', JSON.stringify(teacher));
       setCurrentTeacher(teacher);
       setView('dashboard');
       setLoginError('');
@@ -166,6 +187,8 @@ export default function TeacherPage() {
 
   function handleLogout() {
     sessionStorage.removeItem('teacherLoginTime');
+    sessionStorage.removeItem('teacherId');
+    sessionStorage.removeItem('teacherObj');
     setView('login');
     setCurrentTeacher(null);
     setPassword('');
@@ -730,26 +753,9 @@ export default function TeacherPage() {
       <header className="teacher-header">
         <div className="header-content">
           <button className="btn-hamburger" onClick={() => setSidebarOpen(true)} aria-label="Meniu">☰</button>
-
           <div className="header-center-title">
             <span className="hct-subject">{currentTeacher?.subject}</span>
             <span className="hct-school">LT Ion Pelivan</span>
-          </div>
-
-          <div className="header-actions header-actions-desktop">
-            <button
-              className={`btn-lock${locked ? ' locked' : ''}`}
-              onClick={handleToggleLock}
-              disabled={lockLoading}
-              title={locked ? 'Deschide înregistrarea' : 'Blochează înregistrarea'}
-            >
-              {locked ? '🔒 Blocat' : '🔓 Activ'}
-            </button>
-            <button className="btn-secondary" onClick={() => setQrVisible(v => !v)}>
-              {qrVisible ? 'Ascunde QR' : '📱 QR'}
-            </button>
-            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>{darkMode ? '☀' : '🌙'}</button>
-            <button className="btn-outline" onClick={handleLogout}>Ieșire</button>
           </div>
         </div>
       </header>

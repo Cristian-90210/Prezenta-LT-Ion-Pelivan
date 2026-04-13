@@ -596,12 +596,10 @@ html, body, #root {
 }
 
 .header-content {
-  padding: 22px 32px 18px;
+  padding: 16px 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
   position: relative;
 }
 .header-title { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
@@ -611,7 +609,6 @@ html, body, #root {
   letter-spacing: -0.03em;
 }
 .header-teacher-name { font-size: 0.95rem; opacity: 0.8; font-weight: 500; }
-.header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 .teacher-main {
   max-width: 1060px;
@@ -1229,7 +1226,6 @@ html, body, #root {
 
 @media (max-width: 768px) {
   .btn-hamburger { display: flex; }
-  .header-actions-desktop { display: none !important; }
   .dash-tabs { display: none !important; }
 }
 
@@ -2325,34 +2321,27 @@ html, body, #root {
 }
 .tsf-action-btn:hover { background: var(--gray-100); }
 
-/* ── Centered discipline name in header ── */
+/* Header title block */
 .header-center-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 2px;
-  pointer-events: none;
+  flex: 1;
 }
 .hct-subject {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 800;
   color: #fff;
   letter-spacing: -0.02em;
   line-height: 1;
 }
 .hct-school {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: rgba(255,255,255,0.72);
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-
-/* Adjust header-content to be relative so absolute child works */
-.header-content { position: relative; }
 
 /* ══════════════════════════════════════════
    PRINT
