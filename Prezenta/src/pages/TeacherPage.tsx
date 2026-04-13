@@ -9,17 +9,39 @@ import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
 import type { AttendanceRecord } from '../types';
 import { useConfig } from '../hooks/useConfig';
-import type { Teacher } from '../teachers';
+import { TEACHERS, type Teacher } from '../teachers';
+
+// ── Helpers sesiune profesor ───────────────────────────────────────────────────
+function sessionIsValid(key: string): boolean {
+  const t = sessionStorage.getItem(key);
+  if (!t) return false;
+  return 10 * 60 * 1000 - (Date.now() - Number(t)) > 0;
+}
+
+function getStoredTeacher(): Teacher | null {
+  if (!sessionIsValid('teacherLoginTime')) return null;
+  const id = sessionStorage.getItem('teacherId');
+  if (!id) return null;
+  // Încearcă întâi varianta serializată (poate conține date Firestore actualizate)
+  const raw = sessionStorage.getItem('teacherObj');
+  if (raw) {
+    try { return JSON.parse(raw) as Teacher; } catch {}
+  }
+  return TEACHERS.find(t => t.id === id) ?? null;
+}
+import { exportXlsx } from '../utils/exportXlsx';
 
 type View = 'login' | 'dashboard';
 type DashTab = 'lista' | 'statistici' | 'raport' | 'istoric';
 
 export default function TeacherPage() {
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const [view, setView] = useState<View>('login');
+  const [view, setView] = useState<View>(() =>
+    getStoredTeacher() ? 'dashboard' : 'login'
+  );
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(null);
+  const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(getStoredTeacher);
 
   // ── Dark mode ─────────────────────────────────────────────────────────────
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
@@ -152,9 +174,9 @@ export default function TeacherPage() {
     e.preventDefault();
     const teacher = teachers.find(t => t.password === password);
     if (teacher) {
-      if (!sessionStorage.getItem('teacherLoginTime')) {
-        sessionStorage.setItem('teacherLoginTime', String(Date.now()));
-      }
+      sessionStorage.setItem('teacherLoginTime', String(Date.now()));
+      sessionStorage.setItem('teacherId', teacher.id);
+      sessionStorage.setItem('teacherObj', JSON.stringify(teacher));
       setCurrentTeacher(teacher);
       setView('dashboard');
       setLoginError('');
@@ -165,6 +187,8 @@ export default function TeacherPage() {
 
   function handleLogout() {
     sessionStorage.removeItem('teacherLoginTime');
+    sessionStorage.removeItem('teacherId');
+    sessionStorage.removeItem('teacherObj');
     setView('login');
     setCurrentTeacher(null);
     setPassword('');
@@ -276,106 +300,123 @@ export default function TeacherPage() {
     }
   }
 
-  // ── CSV helpers ───────────────────────────────────────────────────────────
-  // null = rând gol (separator vizual); string[] = rând cu valori citate
-  function downloadCSV(rows: (string[] | null)[], filename: string) {
-    const csv = rows
-      .map(row => row === null ? '' : row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
-      .join('\r\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
-  }
+  // ── Excel exports ─────────────────────────────────────────────────────────
 
-  function exportCSV() {
+  function exportXlsxDaily() {
     const dateLong = new Date(selectedDate + 'T12:00:00').toLocaleDateString('ro-RO', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     });
-    downloadCSV(
-      [
-        [`=== PREZENȚĂ — ${currentTeacher?.subject ?? ''} ===`],
-        ['Data:', dateLong],
-        ...(filterClasa ? [['Clasa:', filterClasa]] : []) as (string[])[],
-        ['Total prezenți:', String(filtered.length)],
-        ['---'],
-        null,
-        ['#', 'Prenume', 'Nume', 'Clasa', 'Ora', 'IP'],
-        ...filtered.map((r, i) => [
-          String(i + 1), r.prenume, r.nume, r.clasa,
-          r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
-          r.ip ?? '—',
-        ]),
-      ],
-      `prezenta-${selectedDate}${filterClasa ? '-' + filterClasa : ''}.csv`
-    );
+    exportXlsx({
+      filename: `prezenta-${selectedDate}${filterClasa ? '-' + filterClasa : ''}`,
+      sheets: [{
+        sheetName: 'Prezență',
+        title: `Prezență — ${currentTeacher?.subject ?? ''}`,
+        subtitle: [
+          `Data: ${dateLong}`,
+          ...(filterClasa ? [`Clasa: ${filterClasa}`] : []),
+        ],
+        columns: [
+          { label: '#',       key: 'nr',      type: 'number', align: 'center', minWidth: 4  },
+          { label: 'Prenume', key: 'prenume',  type: 'text'                                  },
+          { label: 'Nume',    key: 'nume',     type: 'text'                                  },
+          { label: 'Clasa',   key: 'clasa',    type: 'text',   align: 'center'               },
+          { label: 'Ora',     key: 'ora',      type: 'time',   align: 'center', minWidth: 8  },
+          { label: 'IP',      key: 'ip',       type: 'text',   align: 'center', minWidth: 12 },
+        ],
+        data: filtered.map((r, i) => ({
+          nr:      i + 1,
+          prenume: r.prenume,
+          nume:    r.nume,
+          clasa:   r.clasa,
+          ora:     r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+          ip:      r.ip ?? '—',
+        })),
+        totals: { label: 'Total prezenți', value: filtered.length },
+      }],
+    });
   }
 
-  function exportIstoricCSV() {
-    downloadCSV(
-      [
-        [`=== RAPORT ELEV — Toate materiile ===`],
-        ['Elev:', `${istoricPrenume} ${istoricNume}`],
-        ['Total prezențe:', String(istoricRecords.length)],
-        ['---'],
-        null,
-        ['#', 'Data', 'Clasa', 'Materie', 'Ora'],
-        ...istoricRecords.map((r, i) => [
-          String(i + 1),
-          new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-          r.clasa,
-          r.materie ?? '—',
-          r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
-        ]),
-      ],
-      `raport-elev-${istoricPrenume}-${istoricNume}.csv`
-    );
+  function exportIstoricXlsx() {
+    exportXlsx({
+      filename: `raport-elev-${istoricPrenume}-${istoricNume}`,
+      sheets: [{
+        sheetName: 'Raport Elev',
+        title: 'Raport Elev – Toate materiile',
+        subtitle: [`Elev: ${istoricPrenume} ${istoricNume}`],
+        columns: [
+          { label: '#',       key: 'nr',      type: 'number', align: 'center', minWidth: 4  },
+          { label: 'Data',    key: 'data',     type: 'date',   align: 'center', minWidth: 12 },
+          { label: 'Clasa',   key: 'clasa',    type: 'text',   align: 'center'               },
+          { label: 'Materie', key: 'materie',  type: 'text'                                  },
+          { label: 'Ora',     key: 'ora',      type: 'time',   align: 'center', minWidth: 8  },
+        ],
+        data: istoricRecords.map((r, i) => ({
+          nr:      i + 1,
+          data:    r.data,
+          clasa:   r.clasa,
+          materie: r.materie || '—',
+          ora:     r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+        })),
+        totals: { label: 'Total prezențe', value: istoricRecords.length },
+      }],
+    });
   }
 
-  function exportRangeCSV() {
-    // Grupăm înregistrările detaliate pe zile
-    const byDate = rangeRecords.reduce<Record<string, typeof rangeRecords>>((acc, r) => {
-      if (!acc[r.data]) acc[r.data] = [];
-      acc[r.data].push(r);
-      return acc;
-    }, {});
-    const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
-
-    const rows: (string[] | null)[] = [
-      [`=== RAPORT INTERVAL — ${currentTeacher?.subject ?? ''} ===`],
-      ['Interval:', `${rangeFrom} → ${rangeTo}`],
-      ['Total înregistrări:', String(rangeRecords.length)],
-      ['Elevi unici:', String(rangeByStudent.length)],
-      ['---'],
-      null,
-      // ── Secțiunea 1: frecvență per elev ──
-      ['=== FRECVENȚĂ ELEVI ==='],
-      ['#', 'Prenume', 'Nume', 'Clasa', 'Zile prezent'],
-      ...rangeByStudent.map((s, i) => [
-        String(i + 1), s.prenume, s.nume, s.clasa, String(s.count),
-      ]),
-      null,
-      // ── Secțiunea 2: detaliu pe zile ──
-      ['=== DETALIU PE ZILE ==='],
-      ...sortedDates.flatMap(date => {
-        const dateLong = new Date(date + 'T12:00:00').toLocaleDateString('ro-RO', {
-          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-        });
-        return [
-          null,
-          [`--- ${dateLong} (${byDate[date].length} prezenți) ---`],
-          ['#', 'Prenume', 'Nume', 'Clasa', 'Ora'],
-          ...byDate[date].map((r, i) => [
-            String(i + 1), r.prenume, r.nume, r.clasa,
-            r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
-          ]),
-        ] as (string[] | null)[];
-      }),
-    ];
-
-    downloadCSV(rows, `raport-${rangeFrom}-${rangeTo}.csv`);
+  function exportRangeXlsx() {
+    exportXlsx({
+      filename: `raport-interval-${rangeFrom}-${rangeTo}`,
+      sheets: [
+        // Sheet 1 — frecvență per elev
+        {
+          sheetName: 'Frecvență Elevi',
+          title: `Raport Interval — ${currentTeacher?.subject ?? ''}`,
+          subtitle: [
+            `Interval: ${rangeFrom} → ${rangeTo}`,
+            `Total înregistrări: ${rangeRecords.length}  ·  Elevi unici: ${rangeByStudent.length}`,
+          ],
+          columns: [
+            { label: '#',            key: 'nr',      type: 'number', align: 'center', minWidth: 4  },
+            { label: 'Prenume',      key: 'prenume',  type: 'text'                                  },
+            { label: 'Nume',         key: 'nume',     type: 'text'                                  },
+            { label: 'Clasa',        key: 'clasa',    type: 'text',   align: 'center'               },
+            { label: 'Zile prezent', key: 'count',    type: 'number', align: 'center', minWidth: 12 },
+          ],
+          data: rangeByStudent.map((s, i) => ({
+            nr:      i + 1,
+            prenume: s.prenume,
+            nume:    s.nume,
+            clasa:   s.clasa,
+            count:   s.count,
+          })),
+          totals: { label: 'Total elevi', value: rangeByStudent.length },
+        },
+        // Sheet 2 — detaliu cronologic
+        {
+          sheetName: 'Detaliu Înregistrări',
+          title: `Detaliu înregistrări — ${currentTeacher?.subject ?? ''}`,
+          subtitle: [`Interval: ${rangeFrom} → ${rangeTo}`],
+          columns: [
+            { label: '#',       key: 'nr',      type: 'number', align: 'center', minWidth: 4  },
+            { label: 'Prenume', key: 'prenume',  type: 'text'                                  },
+            { label: 'Nume',    key: 'nume',     type: 'text'                                  },
+            { label: 'Clasa',   key: 'clasa',    type: 'text',   align: 'center'               },
+            { label: 'Data',    key: 'data',     type: 'date',   align: 'center', minWidth: 12 },
+            { label: 'Ora',     key: 'ora',      type: 'time',   align: 'center', minWidth: 8  },
+          ],
+          data: [...rangeRecords]
+            .sort((a, b) => b.data.localeCompare(a.data))
+            .map((r, i) => ({
+              nr:      i + 1,
+              prenume: r.prenume,
+              nume:    r.nume,
+              clasa:   r.clasa,
+              data:    r.data,
+              ora:     r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+            })),
+          totals: { label: 'Total înregistrări', value: rangeRecords.length },
+        },
+      ],
+    });
   }
 
   // ── PDF helpers ───────────────────────────────────────────────────────────
@@ -712,26 +753,9 @@ export default function TeacherPage() {
       <header className="teacher-header">
         <div className="header-content">
           <button className="btn-hamburger" onClick={() => setSidebarOpen(true)} aria-label="Meniu">☰</button>
-
           <div className="header-center-title">
             <span className="hct-subject">{currentTeacher?.subject}</span>
             <span className="hct-school">LT Ion Pelivan</span>
-          </div>
-
-          <div className="header-actions header-actions-desktop">
-            <button
-              className={`btn-lock${locked ? ' locked' : ''}`}
-              onClick={handleToggleLock}
-              disabled={lockLoading}
-              title={locked ? 'Deschide înregistrarea' : 'Blochează înregistrarea'}
-            >
-              {locked ? '🔒 Blocat' : '🔓 Activ'}
-            </button>
-            <button className="btn-secondary" onClick={() => setQrVisible(v => !v)}>
-              {qrVisible ? 'Ascunde QR' : '📱 QR'}
-            </button>
-            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>{darkMode ? '☀' : '🌙'}</button>
-            <button className="btn-outline" onClick={handleLogout}>Ieșire</button>
           </div>
         </div>
       </header>
@@ -1027,7 +1051,7 @@ export default function TeacherPage() {
                 </span>
                 {filtered.length > 0 && (
                   <>
-                    <button className="btn-action" onClick={exportCSV}>⬇ CSV</button>
+                    <button className="btn-action" onClick={exportXlsxDaily}>⬇ Excel</button>
                     <button className="btn-action btn-pdf no-print" onClick={exportPDF}>⬇ PDF</button>
                     <button className="btn-action no-print" onClick={() => window.print()}>🖨 Print</button>
                   </>
@@ -1186,7 +1210,7 @@ export default function TeacherPage() {
                       <strong>{rangeRecords.length}</strong> înregistrări,{' '}
                       <strong>{rangeByStudent.length}</strong> elevi unici
                     </span>
-                    <button className="btn-action" onClick={exportRangeCSV}>⬇ CSV</button>
+                    <button className="btn-action" onClick={exportRangeXlsx}>⬇ Excel</button>
                     <button className="btn-action btn-pdf" onClick={exportRangePDF}>⬇ PDF</button>
                   </div>
                   <div className="attendance-table-wrap">
@@ -1297,7 +1321,7 @@ export default function TeacherPage() {
                       <strong>{istoricPrenume} {istoricNume}</strong>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <span className="istoric-count">{istoricRecords.length} prezențe</span>
-                        <button className="btn-action" onClick={exportIstoricCSV}>⬇ CSV</button>
+                        <button className="btn-action" onClick={exportIstoricXlsx}>⬇ Excel</button>
                         <button className="btn-action btn-pdf" onClick={exportIstoricPDF}>⬇ PDF</button>
                       </div>
                     </div>

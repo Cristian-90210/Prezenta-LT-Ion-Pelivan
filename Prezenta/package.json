@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
+    "exceljs": "^4.4.0",
     "firebase": "^12.11.0",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",

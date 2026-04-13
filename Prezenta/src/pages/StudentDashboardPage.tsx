@@ -447,15 +447,9 @@ export default function StudentDashboardPage() {
         <div className="header-content">
           <button className="btn-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
           {!isOnline && <span className="offline-badge">Offline</span>}
-
           <div className="header-center-title">
             <span className="hct-subject">Prezență</span>
             <span className="hct-school">LT Ion Pelivan</span>
-          </div>
-
-          <div className="header-actions header-actions-desktop">
-            <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>{darkMode ? '☀' : '🌙'}</button>
-            <button className="btn-outline" onClick={() => signOut(auth)}>↩ Ieșire</button>
           </div>
         </div>
       </header>
