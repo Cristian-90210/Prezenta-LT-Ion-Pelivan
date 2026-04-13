@@ -2451,6 +2451,78 @@ html, body, #root {
 .photo-upload-hint { font-size: 0.75rem; color: var(--text-muted); }
 
 /* ══════════════════════════════════════════
+   CROP MODAL
+══════════════════════════════════════════ */
+.crop-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 360px;
+  overflow: hidden;
+  animation: slideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  display: flex;
+  flex-direction: column;
+}
+.crop-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--indigo-light);
+}
+.crop-modal-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--indigo);
+  letter-spacing: -0.01em;
+}
+.crop-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.crop-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+.crop-canvas {
+  border-radius: 50%;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  max-width: 100%;
+  height: auto;
+}
+.crop-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.crop-slider-icon { font-size: 0.85rem; color: var(--text-muted); flex-shrink: 0; }
+.crop-slider {
+  flex: 1;
+  accent-color: var(--indigo);
+  height: 4px;
+  cursor: pointer;
+}
+.crop-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--gray-50);
+}
+
+/* ══════════════════════════════════════════
    PRINT
 ══════════════════════════════════════════ */
 @media print {

@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { compressImage } from '../utils/compressImage';
 
 // ── Hook pentru elevul Firebase Auth ─────────────────────────────────────────
 
 export function useStudentPhoto(uid: string | undefined) {
   const [photoURL, setPhotoURL] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState('');
 
   useEffect(() => {
     if (!uid) return;
@@ -18,30 +17,31 @@ export function useStudentPhoto(uid: string | undefined) {
     return () => unsub();
   }, [uid]);
 
-  async function uploadPhoto(file: File) {
-    if (!uid) return;
+  async function savePhoto(base64: string): Promise<boolean> {
+    if (!uid) return false;
     setError('');
-    setUploading(true);
+    setSaving(true);
     try {
-      const base64 = await compressImage(file);
       await updateDoc(doc(db, 'students', uid), { photoURL: base64 });
+      return true;
     } catch (err: any) {
-      console.error('[useStudentPhoto] uploadPhoto error:', err?.code, err?.message);
-      setError(`Eroare: ${err?.code ?? err?.message ?? 'necunoscută'}`);
+      console.error('[useStudentPhoto] savePhoto error:', err?.code, err?.message);
+      setError(`Eroare la salvare: ${err?.code ?? err?.message ?? 'necunoscută'}`);
+      return false;
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   }
 
-  return { photoURL, uploading, error, uploadPhoto };
+  return { photoURL, saving, error, savePhoto };
 }
 
 // ── Hook pentru profesor (fără Firebase Auth) ─────────────────────────────────
 
 export function useTeacherPhoto(teacherId: string | undefined) {
   const [photoURL, setPhotoURL] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState('');
 
   useEffect(() => {
     if (!teacherId) return;
@@ -51,29 +51,30 @@ export function useTeacherPhoto(teacherId: string | undefined) {
     return () => unsub();
   }, [teacherId]);
 
-  async function uploadPhoto(file: File) {
-    if (!teacherId) return;
+  async function savePhoto(base64: string): Promise<boolean> {
+    if (!teacherId) return false;
     setError('');
-    setUploading(true);
+    setSaving(true);
     try {
-      const base64 = await compressImage(file);
       await setDoc(
         doc(db, 'settings', 'teacherPhotos'),
         { [teacherId]: base64 },
         { merge: true },
       );
+      return true;
     } catch (err: any) {
-      console.error('[useTeacherPhoto] uploadPhoto error:', err?.code, err?.message);
-      setError(`Eroare: ${err?.code ?? err?.message ?? 'necunoscută'}`);
+      console.error('[useTeacherPhoto] savePhoto error:', err?.code, err?.message);
+      setError(`Eroare la salvare: ${err?.code ?? err?.message ?? 'necunoscută'}`);
+      return false;
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   }
 
-  return { photoURL, uploading, error, uploadPhoto };
+  return { photoURL, saving, error, savePhoto };
 }
 
-// ── Citire foto oricărui profesor (read-only, pt. a arăta în tabele) ──────────
+// ── Citire foto oricărui profesor (read-only) ─────────────────────────────────
 
 export function useTeacherPhotoById(teacherId: string | undefined) {
   const [photoURL, setPhotoURL] = useState<string | null>(null);

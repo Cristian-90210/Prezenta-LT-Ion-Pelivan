@@ -11,6 +11,7 @@ import type { AttendanceRecord } from '../types';
 import { useConfig } from '../hooks/useConfig';
 import { TEACHERS, type Teacher } from '../teachers';
 import { useTeacherPhoto } from '../hooks/useProfilePhoto';
+import CropModal from '../components/CropModal';
 
 // ── Helpers sesiune profesor ───────────────────────────────────────────────────
 function sessionIsValid(key: string): boolean {
@@ -652,8 +653,9 @@ export default function TeacherPage() {
   }
 
   // ── Dashboard ──────────────────────────────────────────────────────────────
-  const { photoURL: teacherPhoto, uploading: photoUploading, error: photoError, uploadPhoto } =
+  const { photoURL: teacherPhoto, saving: photoUploading, error: photoError, savePhoto } =
     useTeacherPhoto(currentTeacher?.id);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   const TAB_ITEMS: { id: DashTab; icon: string; label: string }[] = [
     { id: 'lista',      icon: '📋', label: 'Listă' },
@@ -1404,12 +1406,12 @@ export default function TeacherPage() {
                       disabled={photoUploading}
                       onChange={e => {
                         const f = e.target.files?.[0];
-                        if (f) uploadPhoto(f);
+                        if (f) setCropFile(f);
                         e.target.value = '';
                       }}
                     />
                   </label>
-                  <span className="photo-upload-hint">JPG, PNG · max ~5 MB · va fi redusă automat</span>
+                  <span className="photo-upload-hint">JPG, PNG · ajustare circulară</span>
                   {photoError && <span style={{ color: 'var(--rose)', fontSize: '0.8rem' }}>{photoError}</span>}
                 </div>
               </div>
@@ -1439,6 +1441,14 @@ export default function TeacherPage() {
 
       </main>
       </div>
+
+      {cropFile && (
+        <CropModal
+          file={cropFile}
+          onConfirm={base64 => { savePhoto(base64); setCropFile(null); }}
+          onCancel={() => setCropFile(null)}
+        />
+      )}
     </div>
   );
 }

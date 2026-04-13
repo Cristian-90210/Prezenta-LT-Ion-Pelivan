@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useStudentPhoto } from '../hooks/useProfilePhoto';
+import CropModal from '../components/CropModal';
 
 interface StudentProfile {
   prenume: string;
@@ -75,7 +76,11 @@ export default function StudentDashboardPage() {
 
   const isOnline = useOnlineStatus();
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
-  const { photoURL, uploading: photoUploading, error: photoError, uploadPhoto } = useStudentPhoto(user?.uid);
+  const { photoURL, saving: photoSaving, error: photoError, savePhoto } = useStudentPhoto(user?.uid);
+
+  // Foto pending (crop confirmat dar nesalvat încă)
+  const [pendingPhoto, setPendingPhoto]   = useState<string | null>(null);
+  const [cropFile,     setCropFile]       = useState<File | null>(null);
 
   // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
   useEffect(() => {
@@ -185,9 +190,15 @@ export default function StudentDashboardPage() {
     setProfileSaving(true);
     setProfileMsg('');
     try {
+      // Salvează datele profilului
       const updated: StudentProfile = { ...profile, prenume, nume, clasa: editClasa };
       await setDoc(doc(db, 'students', user.uid), updated);
       setProfile(updated);
+      // Salvează poza pending (dacă există)
+      if (pendingPhoto) {
+        const ok = await savePhoto(pendingPhoto);
+        if (ok) setPendingPhoto(null);
+      }
       setProfileMsg('✓ Profilul a fost actualizat!');
     } catch {
       setProfileMsg('Eroare la salvare. Încearcă din nou.');
@@ -677,37 +688,48 @@ export default function StudentDashboardPage() {
           </div>
         )}
 
+        {/* ══ CropModal ══ */}
+        {cropFile && (
+          <CropModal
+            file={cropFile}
+            onConfirm={base64 => { setPendingPhoto(base64); setCropFile(null); }}
+            onCancel={() => setCropFile(null)}
+          />
+        )}
+
         {/* ══ TAB: Profilul meu ══ */}
         {dashTab === 'profil' && profile && (
           <div style={{ maxWidth: 480, margin: '0 auto', width: '100%' }}>
 
-            {/* ── Poza de profil ── */}
-            <div className="controls" style={{ marginBottom: 0 }}>
-              <h3 className="admin-section-title">Poza de profil</h3>
-              <div className="photo-upload-area">
-                {photoURL
-                  ? <img src={photoURL} alt="avatar" className="photo-preview" />
-                  : <div className="photo-preview-placeholder">{profile.prenume.charAt(0).toUpperCase()}</div>
-                }
-                <div className="photo-upload-info">
-                  <label className="photo-upload-label">
-                    {photoUploading ? 'Se încarcă...' : photoURL ? 'Schimbă poza' : 'Adaugă poza'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={photoUploading}
-                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); e.target.value = ''; }}
-                    />
-                  </label>
-                  <span className="photo-upload-hint">JPG, PNG · max ~5 MB · va fi redusă automat</span>
-                  {photoError && <span style={{ color: 'var(--rose)', fontSize: '0.8rem' }}>{photoError}</span>}
-                </div>
-              </div>
-            </div>
-
             <div className="controls">
               <h3 className="admin-section-title">Editează profilul</h3>
               <form onSubmit={handleSaveProfile}>
+
+                {/* ── Poza de profil ── */}
+                <div className="photo-upload-area">
+                  {pendingPhoto
+                    ? <img src={pendingPhoto} alt="avatar" className="photo-preview" />
+                    : photoURL
+                      ? <img src={photoURL} alt="avatar" className="photo-preview" />
+                      : <div className="photo-preview-placeholder">{profile.prenume.charAt(0).toUpperCase()}</div>
+                  }
+                  <div className="photo-upload-info">
+                    <label className="photo-upload-label">
+                      {pendingPhoto ? '✓ Poză selectată — schimbă' : photoURL ? 'Schimbă poza' : 'Adaugă poza'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={profileSaving}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) setCropFile(f); e.target.value = ''; }}
+                      />
+                    </label>
+                    <span className="photo-upload-hint">
+                      {pendingPhoto ? 'Poza va fi salvată când apeși „Salvează modificările"' : 'JPG, PNG · ajustare circulară'}
+                    </span>
+                    {photoError && <span style={{ color: 'var(--rose)', fontSize: '0.8rem' }}>{photoError}</span>}
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: 12 }}>
                   <div className="field" style={{ flex: 1 }}>
                     <label htmlFor="ep-prenume">Prenume</label>
@@ -717,7 +739,6 @@ export default function StudentDashboardPage() {
                       value={editPrenume}
                       onChange={e => setEditPrenume(e.target.value)}
                       disabled={profileSaving}
-                      autoFocus
                     />
                   </div>
                   <div className="field" style={{ flex: 1 }}>
@@ -776,8 +797,8 @@ export default function StudentDashboardPage() {
                   </p>
                 )}
 
-                <button type="submit" className="btn-primary" disabled={profileSaving}>
-                  {profileSaving ? 'Se salvează...' : 'Salvează modificările'}
+                <button type="submit" className="btn-primary" disabled={profileSaving || photoSaving}>
+                  {(profileSaving || photoSaving) ? 'Se salvează...' : 'Salvează modificările'}
                 </button>
               </form>
             </div>
