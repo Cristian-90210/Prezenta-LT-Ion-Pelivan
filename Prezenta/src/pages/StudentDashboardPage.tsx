@@ -75,6 +75,21 @@ export default function StudentDashboardPage() {
   const isOnline = useOnlineStatus();
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
+  // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
+  useEffect(() => {
+    if (!user) {
+      sessionStorage.removeItem('studentLoginTime');
+      return;
+    }
+    const stored = sessionStorage.getItem('studentLoginTime');
+    const loginTime = stored ? Number(stored) : Date.now();
+    if (!stored) sessionStorage.setItem('studentLoginTime', String(loginTime));
+    const remaining = 10 * 60 * 1000 - (Date.now() - loginTime);
+    if (remaining <= 0) { signOut(auth); return; }
+    const timer = setTimeout(() => signOut(auth), remaining);
+    return () => clearTimeout(timer);
+  }, [user]);
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('darkMode', String(darkMode));
