@@ -67,6 +67,18 @@ export default function AdminPage() {
     localStorage.setItem('darkMode', String(darkMode));
   }, [darkMode]);
 
+  // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
+  useEffect(() => {
+    if (!loggedIn) return;
+    const stored = sessionStorage.getItem('adminLoginTime');
+    const loginTime = stored ? Number(stored) : Date.now();
+    if (!stored) sessionStorage.setItem('adminLoginTime', String(loginTime));
+    const remaining = 10 * 60 * 1000 - (Date.now() - loginTime);
+    if (remaining <= 0) { handleAdminLogout(); return; }
+    const timer = setTimeout(handleAdminLogout, remaining);
+    return () => clearTimeout(timer);
+  }, [loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Load admin password from Firestore
   useEffect(() => {
     getDoc(doc(db, 'settings', 'admin'))
@@ -76,10 +88,19 @@ export default function AdminPage() {
       .catch(() => setAdminPass('admin2025'));
   }, []);
 
+  function handleAdminLogout() {
+    sessionStorage.removeItem('adminLoginTime');
+    setLoggedIn(false);
+    setSidebarOpen(false);
+  }
+
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (adminPass === null) return;
     if (password === adminPass) {
+      if (!sessionStorage.getItem('adminLoginTime')) {
+        sessionStorage.setItem('adminLoginTime', String(Date.now()));
+      }
       setLoggedIn(true);
       setLoginError('');
     } else {
@@ -283,7 +304,7 @@ export default function AdminPage() {
                   <span className="toggle-slider" />
                 </label>
               </div>
-              <button className="sidebar-logout" onClick={() => { setLoggedIn(false); setSidebarOpen(false); }}>
+              <button className="sidebar-logout" onClick={handleAdminLogout}>
                 ↩ Deconectare
               </button>
             </div>
@@ -303,7 +324,7 @@ export default function AdminPage() {
 
           <div className="header-actions header-actions-desktop">
             <button className="btn-outline" onClick={() => setDarkMode(d => !d)}>{darkMode ? '☀' : '🌙'}</button>
-            <button className="btn-outline" onClick={() => setLoggedIn(false)}>Ieșire</button>
+            <button className="btn-outline" onClick={handleAdminLogout}>Ieșire</button>
           </div>
         </div>
       </header>
@@ -341,7 +362,7 @@ export default function AdminPage() {
                 <span className="toggle-slider" />
               </label>
             </div>
-            <button className="sidebar-logout" onClick={() => setLoggedIn(false)}>↩ Deconectare</button>
+            <button className="sidebar-logout" onClick={handleAdminLogout}>↩ Deconectare</button>
           </div>
         </aside>
 

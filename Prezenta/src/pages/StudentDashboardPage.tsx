@@ -75,6 +75,21 @@ export default function StudentDashboardPage() {
   const isOnline = useOnlineStatus();
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
+  // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
+  useEffect(() => {
+    if (!user) {
+      sessionStorage.removeItem('studentLoginTime');
+      return;
+    }
+    const stored = sessionStorage.getItem('studentLoginTime');
+    const loginTime = stored ? Number(stored) : Date.now();
+    if (!stored) sessionStorage.setItem('studentLoginTime', String(loginTime));
+    const remaining = 10 * 60 * 1000 - (Date.now() - loginTime);
+    if (remaining <= 0) { signOut(auth); return; }
+    const timer = setTimeout(() => signOut(auth), remaining);
+    return () => clearTimeout(timer);
+  }, [user]);
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('darkMode', String(darkMode));
@@ -277,6 +292,89 @@ export default function StudentDashboardPage() {
     return (
       <div className="page-center">
         <div style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Se încarcă...</div>
+      </div>
+    );
+  }
+
+  // Profilul lipsă (utilizator nou via Google) — completare obligatorie
+  if (!profile) {
+    return (
+      <div className="page-center">
+        <div className="card" style={{ maxWidth: 440 }}>
+          <div className="card-header" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)' }}>
+            <div className="school-icon">🎓</div>
+            <h1>Completează profilul</h1>
+            <p className="subtitle">Câteva detalii pentru a finaliza înregistrarea</p>
+          </div>
+          <form
+            className="form"
+            onSubmit={async e => {
+              e.preventDefault();
+              const prenume = editPrenume.trim();
+              const nume    = editNume.trim();
+              if (!prenume || !nume || !editClasa) {
+                setProfileMsg('Completează toate câmpurile.');
+                return;
+              }
+              setProfileSaving(true);
+              setProfileMsg('');
+              try {
+                const data = { prenume, nume, clasa: editClasa, email: user!.email ?? '' };
+                await setDoc(doc(db, 'students', user!.uid), data);
+                setProfile(data);
+              } catch {
+                setProfileMsg('Eroare la salvare. Încearcă din nou.');
+              }
+              setProfileSaving(false);
+            }}
+          >
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label>Prenume</label>
+                <input
+                  type="text"
+                  value={editPrenume}
+                  onChange={e => setEditPrenume(e.target.value)}
+                  placeholder="Ion"
+                  autoFocus
+                  disabled={profileSaving}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>Nume de familie</label>
+                <input
+                  type="text"
+                  value={editNume}
+                  onChange={e => setEditNume(e.target.value)}
+                  placeholder="Popescu"
+                  disabled={profileSaving}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label>Clasa</label>
+              <select value={editClasa} onChange={e => setEditClasa(e.target.value)} disabled={profileSaving}>
+                <option value="">— Alege clasa —</option>
+                {(() => {
+                  const gimn  = classes.filter(c => /^(V|VI|VII|VIII|IX)-/.test(c));
+                  const liceu = classes.filter(c => /^(X|XI|XII)-/.test(c));
+                  const alte  = classes.filter(c => !gimn.includes(c) && !liceu.includes(c));
+                  return (
+                    <>
+                      {gimn.length  > 0 && <optgroup label="Clasele V–IX">{gimn.map(c  => <option key={c} value={c}>{c}</option>)}</optgroup>}
+                      {liceu.length > 0 && <optgroup label="Clasele X–XII">{liceu.map(c => <option key={c} value={c}>{c}</option>)}</optgroup>}
+                      {alte.length  > 0 && <optgroup label="Altele">{alte.map(c        => <option key={c} value={c}>{c}</option>)}</optgroup>}
+                    </>
+                  );
+                })()}
+              </select>
+            </div>
+            {profileMsg && <p className="error-msg">{profileMsg}</p>}
+            <button type="submit" className="btn-primary" disabled={profileSaving}>
+              {profileSaving ? 'Se salvează...' : 'Salvează și continuă'}
+            </button>
+          </form>
+        </div>
       </div>
     );
   }

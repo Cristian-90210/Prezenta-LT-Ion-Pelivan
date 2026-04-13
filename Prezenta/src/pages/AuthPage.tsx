@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   sendEmailVerification, sendPasswordResetEmail,
+  signInWithPopup, GoogleAuthProvider,
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useConfig } from '../hooks/useConfig';
 
@@ -56,6 +57,35 @@ export default function AuthPage() {
       setResetSent(true);
     } catch (err: any) {
       setError(authErrorMsg(err.code));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setError('');
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      // Dacă e utilizator nou, creăm profilul din datele Google
+      const profileRef = doc(db, 'students', cred.user.uid);
+      const existing = await getDoc(profileRef);
+      if (!existing.exists()) {
+        const parts = (cred.user.displayName ?? '').trim().split(' ');
+        const prenume = parts[0] ?? '';
+        const restNume = parts.slice(1).join(' ');
+        await setDoc(profileRef, {
+          prenume,
+          nume: restNume,
+          clasa: '',
+          email: cred.user.email ?? '',
+        });
+      }
+    } catch (err: any) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError(authErrorMsg(err.code));
+      }
     } finally {
       setLoading(false);
     }
@@ -116,6 +146,26 @@ export default function AuthPage() {
           <h1>LT Ion Pelivan</h1>
           <p className="subtitle">Sistem de Prezență</p>
         </div>
+
+        {mode !== 'reset' && (
+          <div className="auth-google-section">
+            <button
+              className="btn-google"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              type="button"
+            >
+              <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.9 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.6 20-21 0-1.4-.1-2.7-.5-4z"/>
+                <path fill="#34A853" d="M6.3 14.7l7 5.1C15.1 16.1 19.2 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3c-7.7 0-14.3 4.4-17.7 11.7z"/>
+                <path fill="#FBBC05" d="M24 45c5.5 0 10.5-1.9 14.3-5l-6.6-5.4C29.6 36.1 27 37 24 37c-5.6 0-10.2-3.1-11.7-7.5l-7 5.4C8.7 41.6 15.8 45 24 45z"/>
+                <path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.2-2.3 4.1-4.3 5.4l6.6 5.4C41.9 36.2 45 30.6 45 24c0-1.4-.1-2.7-.5-4z"/>
+              </svg>
+              Continuă cu Google
+            </button>
+            <div className="auth-divider"><span>sau</span></div>
+          </div>
+        )}
 
         {mode !== 'reset' && (
           <div className="auth-tabs">

@@ -83,6 +83,18 @@ export default function TeacherPage() {
     localStorage.setItem('darkMode', String(darkMode));
   }, [darkMode]);
 
+  // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
+  useEffect(() => {
+    if (view !== 'dashboard') return;
+    const stored = sessionStorage.getItem('teacherLoginTime');
+    const loginTime = stored ? Number(stored) : Date.now();
+    if (!stored) sessionStorage.setItem('teacherLoginTime', String(loginTime));
+    const remaining = 10 * 60 * 1000 - (Date.now() - loginTime);
+    if (remaining <= 0) { handleLogout(); return; }
+    const timer = setTimeout(handleLogout, remaining);
+    return () => clearTimeout(timer);
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Load records for selected date ────────────────────────────────────────
   useEffect(() => {
     if (view !== 'dashboard' || !currentTeacher) return;
@@ -140,6 +152,9 @@ export default function TeacherPage() {
     e.preventDefault();
     const teacher = teachers.find(t => t.password === password);
     if (teacher) {
+      if (!sessionStorage.getItem('teacherLoginTime')) {
+        sessionStorage.setItem('teacherLoginTime', String(Date.now()));
+      }
       setCurrentTeacher(teacher);
       setView('dashboard');
       setLoginError('');
@@ -149,6 +164,7 @@ export default function TeacherPage() {
   }
 
   function handleLogout() {
+    sessionStorage.removeItem('teacherLoginTime');
     setView('login');
     setCurrentTeacher(null);
     setPassword('');
