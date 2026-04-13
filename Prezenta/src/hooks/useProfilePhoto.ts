@@ -25,8 +25,9 @@ export function useStudentPhoto(uid: string | undefined) {
     try {
       const base64 = await compressImage(file);
       await updateDoc(doc(db, 'students', uid), { photoURL: base64 });
-    } catch {
-      setError('Eroare la încărcarea imaginii.');
+    } catch (err: any) {
+      console.error('[useStudentPhoto] uploadPhoto error:', err?.code, err?.message);
+      setError(`Eroare: ${err?.code ?? err?.message ?? 'necunoscută'}`);
     } finally {
       setUploading(false);
     }
@@ -61,8 +62,9 @@ export function useTeacherPhoto(teacherId: string | undefined) {
         { [teacherId]: base64 },
         { merge: true },
       );
-    } catch {
-      setError('Eroare la încărcarea imaginii.');
+    } catch (err: any) {
+      console.error('[useTeacherPhoto] uploadPhoto error:', err?.code, err?.message);
+      setError(`Eroare: ${err?.code ?? err?.message ?? 'necunoscută'}`);
     } finally {
       setUploading(false);
     }
