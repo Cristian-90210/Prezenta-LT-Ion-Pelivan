@@ -323,7 +323,6 @@ export default function TeacherPage() {
           { label: 'Nume',    key: 'nume',     type: 'text'                                  },
           { label: 'Clasa',   key: 'clasa',    type: 'text',   align: 'center'               },
           { label: 'Ora',     key: 'ora',      type: 'time',   align: 'center', minWidth: 8  },
-          { label: 'IP',      key: 'ip',       type: 'text',   align: 'center', minWidth: 12 },
         ],
         data: filtered.map((r, i) => ({
           nr:      i + 1,
@@ -331,7 +330,6 @@ export default function TeacherPage() {
           nume:    r.nume,
           clasa:   r.clasa,
           ora:     r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
-          ip:      r.ip ?? '—',
         })),
         totals: { label: 'Total prezenți', value: filtered.length },
       }],

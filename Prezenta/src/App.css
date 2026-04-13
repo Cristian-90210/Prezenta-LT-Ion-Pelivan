@@ -74,8 +74,8 @@
   --surface:      hsl(228, 22%, 12%);
   --surface-hover:hsl(228, 20%, 15%);
   --border:       hsl(228, 18%, 22%);
-  --text:         hsl(228, 20%, 90%);
-  --text-muted:   hsl(228, 12%, 52%);
+  --text:         hsl(0, 0%, 98%);
+  --text-muted:   hsl(228, 14%, 62%);
 
   --header-gradient: linear-gradient(135deg, hsl(238,60%,32%) 0%, hsl(262,55%,36%) 100%);
   --page-gradient:   linear-gradient(150deg, hsl(228,24%,8%) 0%, hsl(238,22%,10%) 100%);
@@ -1896,8 +1896,12 @@ html, body, #root {
 }
 .sd-reg-done .sd-reg-result-icon { background: var(--green-light); color: var(--green); }
 .sd-reg-already .sd-reg-result-icon { background: var(--indigo-light); color: var(--indigo); }
-.sd-reg-locked .sd-reg-result-icon { background: var(--gray-100); color: var(--gray-600); font-size: 1.5rem; }
+.sd-reg-locked .sd-reg-result-icon { background: var(--amber-light); color: var(--amber); font-size: 1.5rem; }
 .sd-reg-error .sd-reg-result-icon { background: var(--rose-light); color: var(--rose); }
+:root.dark .sd-reg-locked .sd-reg-result-icon { background: hsla(38,92%,50%,0.22); color: hsl(38,95%,62%); }
+:root.dark .sd-reg-done .sd-reg-result-icon { background: hsla(172,66%,41%,0.22); color: hsl(172,60%,55%); }
+:root.dark .sd-reg-already .sd-reg-result-icon { background: hsla(238,75%,58%,0.22); color: hsl(238,90%,75%); }
+:root.dark .sd-reg-error .sd-reg-result-icon { background: hsla(355,78%,56%,0.22); color: hsl(355,85%,72%); }
 
 .sd-reg-result-title { font-size: 1.15rem; font-weight: 800; color: var(--text); }
 .sd-reg-result-sub { font-size: 0.875rem; color: var(--text-muted); line-height: 1.5; }
