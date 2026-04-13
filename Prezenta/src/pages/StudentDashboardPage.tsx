@@ -9,6 +9,7 @@ import { auth, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useStudentPhoto } from '../hooks/useProfilePhoto';
 
 interface StudentProfile {
   prenume: string;
@@ -74,6 +75,7 @@ export default function StudentDashboardPage() {
 
   const isOnline = useOnlineStatus();
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const { photoURL, uploading: photoUploading, error: photoError, uploadPhoto } = useStudentPhoto(user?.uid);
 
   // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
   useEffect(() => {
@@ -446,11 +448,21 @@ export default function StudentDashboardPage() {
       <header className="teacher-header">
         <div className="header-content">
           <button className="btn-hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
-          {!isOnline && <span className="offline-badge">Offline</span>}
           <div className="header-center-title">
             <span className="hct-subject">Prezență</span>
             <span className="hct-school">LT Ion Pelivan</span>
           </div>
+          <button
+            className="header-profile-btn"
+            onClick={() => goTab('profil')}
+            title="Profilul meu"
+            aria-label="Profilul meu"
+          >
+            {photoURL
+              ? <img src={photoURL} alt="avatar" />
+              : (profile?.prenume?.charAt(0).toUpperCase() ?? '👤')
+            }
+          </button>
         </div>
       </header>
 
@@ -668,6 +680,31 @@ export default function StudentDashboardPage() {
         {/* ══ TAB: Profilul meu ══ */}
         {dashTab === 'profil' && profile && (
           <div style={{ maxWidth: 480, margin: '0 auto', width: '100%' }}>
+
+            {/* ── Poza de profil ── */}
+            <div className="controls" style={{ marginBottom: 0 }}>
+              <h3 className="admin-section-title">Poza de profil</h3>
+              <div className="photo-upload-area">
+                {photoURL
+                  ? <img src={photoURL} alt="avatar" className="photo-preview" />
+                  : <div className="photo-preview-placeholder">{profile.prenume.charAt(0).toUpperCase()}</div>
+                }
+                <div className="photo-upload-info">
+                  <label className="photo-upload-label">
+                    {photoUploading ? 'Se încarcă...' : photoURL ? 'Schimbă poza' : 'Adaugă poza'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={photoUploading}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); e.target.value = ''; }}
+                    />
+                  </label>
+                  <span className="photo-upload-hint">JPG, PNG · max ~5 MB · va fi redusă automat</span>
+                  {photoError && <span style={{ color: 'var(--rose)', fontSize: '0.8rem' }}>{photoError}</span>}
+                </div>
+              </div>
+            </div>
+
             <div className="controls">
               <h3 className="admin-section-title">Editează profilul</h3>
               <form onSubmit={handleSaveProfile}>

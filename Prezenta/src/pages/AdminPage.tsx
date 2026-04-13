@@ -330,6 +330,14 @@ export default function AdminPage() {
             <span className="hct-subject">Administrator</span>
             <span className="hct-school">LT Ion Pelivan</span>
           </div>
+          <div
+            className="header-profile-btn"
+            style={{ cursor: 'default', fontSize: '1.3rem' }}
+            title="Administrator"
+            aria-label="Administrator"
+          >
+            🛡
+          </div>
         </div>
       </header>
 

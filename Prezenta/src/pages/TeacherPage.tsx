@@ -10,6 +10,7 @@ import { db } from '../firebase';
 import type { AttendanceRecord } from '../types';
 import { useConfig } from '../hooks/useConfig';
 import { TEACHERS, type Teacher } from '../teachers';
+import { useTeacherPhoto } from '../hooks/useProfilePhoto';
 
 // ── Helpers sesiune profesor ───────────────────────────────────────────────────
 function sessionIsValid(key: string): boolean {
@@ -32,7 +33,7 @@ function getStoredTeacher(): Teacher | null {
 import { exportXlsx } from '../utils/exportXlsx';
 
 type View = 'login' | 'dashboard';
-type DashTab = 'lista' | 'statistici' | 'raport' | 'istoric';
+type DashTab = 'lista' | 'statistici' | 'raport' | 'istoric' | 'profil';
 
 export default function TeacherPage() {
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -651,11 +652,15 @@ export default function TeacherPage() {
   }
 
   // ── Dashboard ──────────────────────────────────────────────────────────────
+  const { photoURL: teacherPhoto, uploading: photoUploading, error: photoError, uploadPhoto } =
+    useTeacherPhoto(currentTeacher?.id);
+
   const TAB_ITEMS: { id: DashTab; icon: string; label: string }[] = [
     { id: 'lista',      icon: '📋', label: 'Listă' },
     { id: 'statistici', icon: '📊', label: 'Statistici' },
     { id: 'raport',     icon: '📅', label: 'Raport interval' },
     { id: 'istoric',    icon: '👤', label: 'Raport elev' },
+    { id: 'profil',     icon: '🧑', label: 'Profilul meu' },
   ];
 
   return (
@@ -757,6 +762,17 @@ export default function TeacherPage() {
             <span className="hct-subject">{currentTeacher?.subject}</span>
             <span className="hct-school">LT Ion Pelivan</span>
           </div>
+          <button
+            className="header-profile-btn"
+            onClick={() => setDashTab('profil')}
+            title="Profilul meu"
+            aria-label="Profilul meu"
+          >
+            {teacherPhoto
+              ? <img src={teacherPhoto} alt="avatar" />
+              : (currentTeacher?.name?.charAt(0).toUpperCase() ?? '👩')
+            }
+          </button>
         </div>
       </header>
 
@@ -1364,6 +1380,63 @@ export default function TeacherPage() {
             )}
           </>
         )}
+
+        {/* ══════════════ TAB: PROFILUL MEU ══════════════ */}
+        {dashTab === 'profil' && (
+          <div style={{ maxWidth: 480, margin: '0 auto', width: '100%' }}>
+
+            {/* ── Poza de profil ── */}
+            <div className="controls" style={{ marginBottom: 0 }}>
+              <h3 className="admin-section-title">Poza de profil</h3>
+              <div className="photo-upload-area">
+                {teacherPhoto
+                  ? <img src={teacherPhoto} alt="avatar" className="photo-preview" />
+                  : <div className="photo-preview-placeholder">
+                      {currentTeacher?.name?.charAt(0).toUpperCase() ?? '👩'}
+                    </div>
+                }
+                <div className="photo-upload-info">
+                  <label className="photo-upload-label">
+                    {photoUploading ? 'Se încarcă...' : teacherPhoto ? 'Schimbă poza' : 'Adaugă poza'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={photoUploading}
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) uploadPhoto(f);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  <span className="photo-upload-hint">JPG, PNG · max ~5 MB · va fi redusă automat</span>
+                  {photoError && <span style={{ color: 'var(--rose)', fontSize: '0.8rem' }}>{photoError}</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Info cont ── */}
+            <div className="controls">
+              <h3 className="admin-section-title">Informații</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Nume</span>
+                  <span style={{ fontWeight: 700 }}>{currentTeacher?.name}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Materie</span>
+                  <span style={{ fontWeight: 700, color: 'var(--indigo)' }}>{currentTeacher?.subject}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Rol</span>
+                  <span className="badge">Profesor</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+
       </main>
       </div>
     </div>
