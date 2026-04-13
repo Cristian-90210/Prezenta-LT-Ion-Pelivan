@@ -72,6 +72,11 @@ export default function TeacherPage() {
   // ── Delete ────────────────────────────────────────────────────────────────
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  // ── Photo (must be before any conditional return — Rules of Hooks) ────────
+  const { photoURL: teacherPhoto, saving: photoUploading, error: photoError, savePhoto } =
+    useTeacherPhoto(currentTeacher?.id);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+
   // ── Edit ──────────────────────────────────────────────────────────────────
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [editPrenume, setEditPrenume] = useState('');
@@ -651,10 +656,6 @@ export default function TeacherPage() {
   }
 
   // ── Dashboard ──────────────────────────────────────────────────────────────
-  const { photoURL: teacherPhoto, saving: photoUploading, error: photoError, savePhoto } =
-    useTeacherPhoto(currentTeacher?.id);
-  const [cropFile, setCropFile] = useState<File | null>(null);
-
   const TAB_ITEMS: { id: DashTab; icon: string; label: string }[] = [
     { id: 'lista',      icon: '📋', label: 'Listă' },
     { id: 'statistici', icon: '📊', label: 'Statistici' },
