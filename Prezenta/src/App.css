@@ -1599,8 +1599,169 @@ html, body, #root {
 }
 
 /* ══════════════════════════════════════════
-   AUTH PAGE
+   AUTH PAGE  (Dropbox-inspired)
 ══════════════════════════════════════════ */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 32px 16px;
+  background: linear-gradient(150deg, hsl(238,60%,97%) 0%, hsl(248,50%,98%) 50%, hsl(210,50%,97%) 100%);
+}
+:root.dark .auth-page {
+  background: linear-gradient(150deg, hsl(228,24%,8%) 0%, hsl(238,22%,10%) 100%);
+}
+
+/* Brand deasupra cardului */
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.auth-brand-icon { font-size: 2rem; }
+.auth-brand-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, hsl(238,75%,50%) 0%, hsl(262,70%,56%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Cardul principal */
+.auth-card {
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: 0 8px 40px hsla(238,60%,12%,0.12);
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+  animation: slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+:root.dark .auth-card {
+  box-shadow: 0 8px 40px hsla(238,60%,4%,0.45);
+}
+
+.auth-inner {
+  padding: 32px 32px 28px;
+}
+
+.auth-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.auth-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+/* Buton Google hero */
+.btn-google-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 20px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  box-shadow: var(--shadow-sm);
+}
+.btn-google-hero:hover:not(:disabled) {
+  border-color: hsl(238,75%,68%);
+  box-shadow: 0 0 0 3px hsla(238,75%,58%,0.12);
+  background: var(--surface-hover);
+}
+.btn-google-hero:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Separator "sau cu email" */
+.auth-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 0;
+}
+.auth-sep-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.auth-sep-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* Tabs Conectare / Cont nou */
+.auth-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  margin-top: 20px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 12px;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+.auth-tab.active {
+  color: var(--indigo);
+  border-bottom-color: var(--indigo);
+}
+.auth-tab:hover:not(.active) { color: var(--text); }
+
+.auth-switch-hint {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.auth-link {
+  background: none;
+  border: none;
+  color: var(--indigo);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+.auth-link:hover { opacity: 0.75; }
+
+/* Footer (dark toggle) */
+.auth-footer {
+  display: flex;
+  justify-content: center;
+}
+
 /* Reset parolă — ecran succes */
 .reset-success {
   display: flex;
@@ -1622,51 +1783,6 @@ html, body, #root {
   line-height: 1.6;
   max-width: 300px;
 }
-
-.auth-tabs {
-  display: flex;
-  border-bottom: 2px solid var(--border);
-  background: var(--gray-50);
-}
-.auth-tab {
-  flex: 1;
-  padding: 14px;
-  background: none;
-  border: none;
-  font-size: 0.95rem;
-  font-weight: 700;
-  font-family: inherit;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color 0.15s, border-bottom 0.15s;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-}
-.auth-tab.active {
-  color: var(--indigo);
-  border-bottom-color: var(--indigo);
-  background: var(--surface);
-}
-.auth-tab:hover:not(.active) { color: var(--text); background: var(--gray-100); }
-
-.auth-switch-hint {
-  text-align: center;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin-top: 4px;
-}
-.auth-link {
-  background: none;
-  border: none;
-  color: var(--indigo);
-  font-weight: 700;
-  cursor: pointer;
-  font-size: inherit;
-  font-family: inherit;
-  padding: 0;
-  text-decoration: underline;
-}
-.auth-link:hover { opacity: 0.75; }
 
 /* ══════════════════════════════════════════
    STUDENT DASHBOARD

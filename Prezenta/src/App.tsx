@@ -8,14 +8,9 @@ import './App.css';
 
 function StudentRouter() {
   const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="page-center">
-        <div style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>Se încarcă...</div>
-      </div>
-    );
-  }
-  return user ? <StudentDashboardPage /> : <AuthPage />;
+  // Arată login imediat; dacă Firebase confirmă sesiunea, trece automat la dashboard
+  if (loading || !user) return <AuthPage />;
+  return <StudentDashboardPage />;
 }
 
 export default function App() {

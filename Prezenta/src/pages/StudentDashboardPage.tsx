@@ -57,9 +57,7 @@ export default function StudentDashboardPage() {
   const [recordsLoading, setRecordsLoading] = useState(true);
 
   const [regState, setRegState]       = useState<RegState>('idle');
-  const [dashTab, setDashTab]         = useState<StudentTab>(
-    () => (localStorage.getItem('studentTab') as StudentTab) ?? 'scan',
-  );
+  const [dashTab, setDashTab]         = useState<StudentTab>('scan');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const scannerRef = useRef<any>(null);
@@ -88,13 +86,25 @@ export default function StudentDashboardPage() {
       sessionStorage.removeItem('studentLoginTime');
       return;
     }
+    const TIMEOUT = 10 * 60 * 1000;
     const stored = sessionStorage.getItem('studentLoginTime');
     const loginTime = stored ? Number(stored) : Date.now();
     if (!stored) sessionStorage.setItem('studentLoginTime', String(loginTime));
-    const remaining = 10 * 60 * 1000 - (Date.now() - loginTime);
+
+    const checkAndLogout = () => {
+      if (Date.now() - loginTime >= TIMEOUT) signOut(auth);
+    };
+
+    const remaining = TIMEOUT - (Date.now() - loginTime);
     if (remaining <= 0) { signOut(auth); return; }
+
     const timer = setTimeout(() => signOut(auth), remaining);
-    return () => clearTimeout(timer);
+    // Pe mobil, timer-ul e înghețat în background — verificăm când revine în prim plan
+    document.addEventListener('visibilitychange', checkAndLogout);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', checkAndLogout);
+    };
   }, [user]);
 
   useEffect(() => {
@@ -297,7 +307,6 @@ export default function StudentDashboardPage() {
 
   function goTab(tab: StudentTab) {
     setDashTab(tab);
-    localStorage.setItem('studentTab', tab);
     setSidebarOpen(false);
   }
 

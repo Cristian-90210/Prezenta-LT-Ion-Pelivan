@@ -72,6 +72,11 @@ export default function TeacherPage() {
   // ── Delete ────────────────────────────────────────────────────────────────
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  // ── Photo (must be before any conditional return — Rules of Hooks) ────────
+  const { photoURL: teacherPhoto, saving: photoUploading, error: photoError, savePhoto } =
+    useTeacherPhoto(currentTeacher?.id);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+
   // ── Edit ──────────────────────────────────────────────────────────────────
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [editPrenume, setEditPrenume] = useState('');
@@ -110,13 +115,25 @@ export default function TeacherPage() {
   // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
   useEffect(() => {
     if (view !== 'dashboard') return;
+    const TIMEOUT = 10 * 60 * 1000;
     const stored = sessionStorage.getItem('teacherLoginTime');
     const loginTime = stored ? Number(stored) : Date.now();
     if (!stored) sessionStorage.setItem('teacherLoginTime', String(loginTime));
-    const remaining = 10 * 60 * 1000 - (Date.now() - loginTime);
+
+    const checkAndLogout = () => {
+      if (Date.now() - loginTime >= TIMEOUT) handleLogout();
+    };
+
+    const remaining = TIMEOUT - (Date.now() - loginTime);
     if (remaining <= 0) { handleLogout(); return; }
+
     const timer = setTimeout(handleLogout, remaining);
-    return () => clearTimeout(timer);
+    // Pe mobil, timer-ul e înghețat în background — verificăm când revine în prim plan
+    document.addEventListener('visibilitychange', checkAndLogout);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', checkAndLogout);
+    };
   }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load records for selected date ────────────────────────────────────────
@@ -651,10 +668,6 @@ export default function TeacherPage() {
   }
 
   // ── Dashboard ──────────────────────────────────────────────────────────────
-  const { photoURL: teacherPhoto, saving: photoUploading, error: photoError, savePhoto } =
-    useTeacherPhoto(currentTeacher?.id);
-  const [cropFile, setCropFile] = useState<File | null>(null);
-
   const TAB_ITEMS: { id: DashTab; icon: string; label: string }[] = [
     { id: 'lista',      icon: '📋', label: 'Listă' },
     { id: 'statistici', icon: '📊', label: 'Statistici' },
