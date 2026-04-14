@@ -102,6 +102,11 @@ export default function TeacherPage() {
   const [rangeRecords, setRangeRecords] = useState<AttendanceRecord[]>([]);
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeSearched, setRangeSearched] = useState(false);
+  const [rangeFilterClasa, setRangeFilterClasa] = useState('');
+  const [rangeSortDir, setRangeSortDir] = useState<'asc' | 'desc'>('desc');
+
+  // ── Sort lista zilnică ─────────────────────────────────────────────────────
+  const [sortOra, setSortOra] = useState<'asc' | 'desc'>('asc');
 
   const { teachers, classes: ALL_CLASSES } = useConfig();
   const siteUrl = window.location.origin;
@@ -280,7 +285,7 @@ export default function TeacherPage() {
         materie: d.data().materie ?? '',
       }));
       data.sort((a, b) => b.data.localeCompare(a.data));
-      setIstoricRecords(data);
+      setIstoricRecords(data.filter(r => r.materie === currentTeacher.subject));
     } catch (err) {
       console.error(err);
       setIstoricError('Eroare la căutare în baza de date.');
@@ -610,16 +615,21 @@ export default function TeacherPage() {
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const filtered = records.filter(r => {
-    const matchesClasa = !filterClasa || r.clasa === filterClasa;
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !q ||
-      r.prenume.toLowerCase().includes(q) ||
-      r.nume.toLowerCase().includes(q) ||
-      `${r.prenume} ${r.nume}`.toLowerCase().includes(q);
-    return matchesClasa && matchesSearch;
-  });
+  const filtered = records
+    .filter(r => {
+      const matchesClasa = !filterClasa || r.clasa === filterClasa;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        r.prenume.toLowerCase().includes(q) ||
+        r.nume.toLowerCase().includes(q) ||
+        `${r.prenume} ${r.nume}`.toLowerCase().includes(q);
+      return matchesClasa && matchesSearch;
+    })
+    .sort((a, b) => sortOra === 'asc'
+      ? a.timestamp.getTime() - b.timestamp.getTime()
+      : b.timestamp.getTime() - a.timestamp.getTime()
+    );
 
   const statsByClass = ALL_CLASSES
     .map(cls => ({ clasa: cls, count: records.filter(r => r.clasa === cls).length }))
@@ -633,7 +643,9 @@ export default function TeacherPage() {
       acc[key].count++;
       return acc;
     }, {})
-  ).sort((a, b) => b.count - a.count);
+  )
+  .filter(s => !rangeFilterClasa || s.clasa === rangeFilterClasa)
+  .sort((a, b) => rangeSortDir === 'desc' ? b.count - a.count : a.count - b.count);
 
   const qrBaseUrl = `${siteUrl}/?materie=${encodeURIComponent(currentTeacher?.id ?? '')}`;
 
@@ -1064,6 +1076,13 @@ export default function TeacherPage() {
                     placeholder="Prenume sau Nume..."
                   />
                 </div>
+                <div className="field">
+                  <label>Sortare după Ora</label>
+                  <select value={sortOra} onChange={e => setSortOra(e.target.value as 'asc' | 'desc')}>
+                    <option value="asc">↑ Crescător</option>
+                    <option value="desc">↓ Descrescător</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -1219,6 +1238,22 @@ export default function TeacherPage() {
                     <label htmlFor="range-to">Până la</label>
                     <input id="range-to" type="date" value={rangeTo} onChange={e => setRangeTo(e.target.value)} />
                   </div>
+                  <div className="field">
+                    <label htmlFor="range-filter-clasa">Filtrează clasa</label>
+                    <select id="range-filter-clasa" value={rangeFilterClasa} onChange={e => setRangeFilterClasa(e.target.value)}>
+                      <option value="">Toate clasele</option>
+                      <optgroup label="Clasele V–IX">
+                        {ALL_CLASSES.filter(c => ['V','VI','VII','VIII','IX'].some(cls => c.startsWith(cls+'-'))).map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Clasele X–XII">
+                        {ALL_CLASSES.filter(c => ['X','XI','XII'].some(cls => c.startsWith(cls+'-'))).map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
                   <div className="field field-btn">
                     <label>&nbsp;</label>
                     <button type="submit" className="btn-search" disabled={rangeLoading}>
@@ -1238,6 +1273,7 @@ export default function TeacherPage() {
                     <span className="stat">
                       <strong>{rangeRecords.length}</strong> înregistrări,{' '}
                       <strong>{rangeByStudent.length}</strong> elevi unici
+                      {rangeFilterClasa && ` — clasa ${rangeFilterClasa}`}
                     </span>
                     <button className="btn-action" onClick={exportRangeXlsx}>⬇ Excel</button>
                     <button className="btn-action btn-pdf" onClick={exportRangePDF}>⬇ PDF</button>
@@ -1254,7 +1290,13 @@ export default function TeacherPage() {
                           <th>Prenume</th>
                           <th>Nume</th>
                           <th>Clasa</th>
-                          <th>Zile prezent</th>
+                          <th
+                            style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                            onClick={() => setRangeSortDir(d => d === 'desc' ? 'asc' : 'desc')}
+                            title="Click pentru a schimba ordinea"
+                          >
+                            Zile prezent {rangeSortDir === 'desc' ? '↓' : '↑'}
+                          </th>
                         </tr>
                       </thead>
                       <tbody>

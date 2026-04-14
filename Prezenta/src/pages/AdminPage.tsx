@@ -1,11 +1,38 @@
 import { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { TEACHERS, type Teacher } from '../teachers';
 import { useConfig, DEFAULT_CLASSES } from '../hooks/useConfig';
+import { logAudit } from '../utils/auditLog';
+import type { AuditAction } from '../utils/auditLog';
 
-type AdminTab = 'profesori' | 'clase' | 'elevi' | 'setari';
+type AdminTab = 'profesori' | 'clase' | 'elevi' | 'setari' | 'audit';
+
+interface AuditEntry {
+  id: string;
+  timestamp: { toDate(): Date } | null;
+  actor: string;
+  action: AuditAction;
+  details: Record<string, string>;
+}
+
+const ACTION_META: Record<string, { label: string; icon: string; color: string }> = {
+  add_teacher:           { label: 'Profesor adăugat',       icon: '➕', color: '#16a34a' },
+  delete_teacher:        { label: 'Profesor șters',          icon: '🗑️', color: '#dc2626' },
+  edit_teacher:          { label: 'Profesor editat',         icon: '✏️', color: '#2563eb' },
+  add_class:             { label: 'Clasă adăugată',          icon: '➕', color: '#16a34a' },
+  delete_class:          { label: 'Clasă ștearsă',           icon: '🗑️', color: '#dc2626' },
+  delete_student:        { label: 'Elev șters',              icon: '🗑️', color: '#dc2626' },
+  reset_password:        { label: 'Parolă resetată (elev)',  icon: '🔑', color: '#d97706' },
+  change_admin_password: { label: 'Parolă admin schimbată', icon: '🔐', color: '#7c3aed' },
+};
+
+function formatDetails(details: Record<string, string>): string {
+  return Object.entries(details)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(' · ');
+}
 
 interface StudentRecord {
   uid: string;
@@ -73,6 +100,10 @@ export default function AdminPage() {
   const [studentSearch, setStudentSearch] = useState('');
   const [resetMsg, setResetMsg] = useState<Record<string, string>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // Audit log
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   // Mobile sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -159,13 +190,16 @@ export default function AdminPage() {
     }
     setAddTeacherError('');
     await saveTeachers([...teachers, { id, name, subject, password: pass }]);
+    await logAudit('add_teacher', { id, nume: name, materie: subject });
     setNewName('');
     setNewSubject('');
     setNewPassword('');
   }
 
   async function handleDeleteTeacher(id: string) {
+    const t = teachers.find(t => t.id === id);
     await saveTeachers(teachers.filter(t => t.id !== id));
+    if (t) await logAudit('delete_teacher', { id, nume: t.name, materie: t.subject });
   }
 
   function openEditTeacher(t: Teacher) {
@@ -190,6 +224,7 @@ export default function AdminPage() {
       t.id === editingTeacher.id ? { ...t, name, subject, password: pass } : t
     );
     await saveTeachers(updated);
+    await logAudit('edit_teacher', { id: editingTeacher.id, nume: name, materie: subject });
     setEditingTeacher(null);
   }
 
@@ -200,11 +235,13 @@ export default function AdminPage() {
     if (classes.includes(cls)) { setAddClassError('Clasa există deja.'); return; }
     setAddClassError('');
     await saveClasses([...classes, cls]);
+    await logAudit('add_class', { clasa: cls });
     setNewClass('');
   }
 
   async function handleDeleteClass(cls: string) {
     await saveClasses(classes.filter(c => c !== cls));
+    await logAudit('delete_class', { clasa: cls });
   }
 
   const loadStudents = useCallback(async () => {
@@ -230,10 +267,33 @@ export default function AdminPage() {
     if (tab === 'elevi' && loggedIn) loadStudents();
   }, [tab, loggedIn, loadStudents]);
 
+  const loadAuditLog = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const q = query(collection(db, 'audit_log'), orderBy('timestamp', 'desc'), limit(100));
+      const snap = await getDocs(q);
+      setAuditEntries(snap.docs.map(d => ({
+        id: d.id,
+        timestamp: d.data().timestamp ?? null,
+        actor: d.data().actor ?? 'admin',
+        action: d.data().action as AuditAction,
+        details: d.data().details ?? {},
+      })));
+    } catch {
+      setAuditEntries([]);
+    }
+    setAuditLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'audit' && loggedIn) loadAuditLog();
+  }, [tab, loggedIn, loadAuditLog]);
+
   async function handleResetPassword(student: StudentRecord) {
     try {
       await sendPasswordResetEmail(auth, student.email);
       setResetMsg(m => ({ ...m, [student.uid]: '✓ Email trimis!' }));
+      await logAudit('reset_password', { nume: `${student.prenume} ${student.nume}`, email: student.email, clasa: student.clasa });
     } catch {
       setResetMsg(m => ({ ...m, [student.uid]: 'Eroare la trimitere.' }));
     }
@@ -242,7 +302,9 @@ export default function AdminPage() {
 
   async function handleDeleteStudent(uid: string) {
     try {
+      const student = students.find(s => s.uid === uid);
       await deleteDoc(doc(db, 'students', uid));
+      if (student) await logAudit('delete_student', { nume: `${student.prenume} ${student.nume}`, email: student.email, clasa: student.clasa });
       setStudents(s => s.filter(st => st.uid !== uid));
       setDeleteConfirm(null);
     } catch {
@@ -259,6 +321,7 @@ export default function AdminPage() {
       setAdminPass(p);
       setNewAdminPass('');
       setPassMsg('✓ Parola a fost schimbată cu succes!');
+      await logAudit('change_admin_password', {});
     } catch {
       setPassMsg('Eroare la salvare. Încearcă din nou.');
     }
@@ -311,6 +374,7 @@ export default function AdminPage() {
     { id: 'profesori', icon: '👩‍🏫', label: 'Profesori' },
     { id: 'clase',     icon: '🏫', label: 'Clase' },
     { id: 'elevi',     icon: '👨‍🎓', label: 'Elevi' },
+    { id: 'audit',     icon: '📋', label: 'Audit' },
     { id: 'setari',    icon: '⚙️', label: 'Setări' },
   ];
 
@@ -732,6 +796,76 @@ export default function AdminPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* ══ Tab: Audit ══ */}
+        {tab === 'audit' && (
+          <div>
+            <div className="controls" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h3 className="admin-section-title" style={{ marginBottom: 4 }}>Jurnal de activitate</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                  Ultimele 100 de acțiuni efectuate în panoul de administrare.
+                </p>
+              </div>
+              <button className="btn-search" style={{ background: '#7c3aed' }} onClick={loadAuditLog} disabled={auditLoading}>
+                ↻ Reîncarcă
+              </button>
+            </div>
+
+            {auditLoading && (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+                Se încarcă jurnalul...
+              </div>
+            )}
+
+            {!auditLoading && auditEntries.length === 0 && (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
+                Nicio acțiune înregistrată încă.
+              </div>
+            )}
+
+            {!auditLoading && auditEntries.length > 0 && (
+              <div className="attendance-table-wrap">
+                <table className="attendance-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 160 }}>Data și ora</th>
+                      <th style={{ width: 200 }}>Acțiune</th>
+                      <th>Detalii</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditEntries.map(entry => {
+                      const meta = ACTION_META[entry.action] ?? { label: entry.action, icon: '•', color: '#6b7280' };
+                      const date = entry.timestamp ? entry.timestamp.toDate() : null;
+                      const dateStr = date
+                        ? date.toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : '—';
+                      const details = formatDetails(entry.details);
+                      return (
+                        <tr key={entry.id}>
+                          <td className="td-ip" style={{ whiteSpace: 'nowrap' }}>{dateStr}</td>
+                          <td>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              fontWeight: 600, fontSize: '0.82rem', color: meta.color,
+                            }}>
+                              <span>{meta.icon}</span>
+                              {meta.label}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                            {details || <em style={{ opacity: 0.5 }}>—</em>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ══ Tab: Setări ══ */}

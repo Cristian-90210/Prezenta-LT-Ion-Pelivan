@@ -19,23 +19,27 @@ A digital attendance management system built with React, TypeScript, and Firebas
 
 ### Teacher Dashboard (`/teacher`)
 - **Real-time attendance list** — live updates as students check in, filterable by class and searchable by name
+- **Sort by check-in time** — ascending or descending sort on the daily list by the time each student registered
 - **QR code generation** — general QR for the subject or individual QR per class (pre-fills the class field automatically)
 - **QR zoom** — click any QR in the grid to enlarge it fullscreen, navigate between classes with prev/next buttons
 - **Lock / unlock** — teacher can block new registrations mid-class; students see a "Registration closed" screen
 - **Statistics tab** — attendance count by class with a horizontal bar chart
-- **Interval report** — select a date range to see all attendances; student frequency table + full chronological detail
-- **Student report** — look up any student by name to see their full attendance history across all subjects
-- **Export CSV** — download attendance data as CSV (daily list, interval report, student report)
+- **Interval report** — select a date range to see all attendances; filter by class, sort by presence count (ascending/descending) via clickable column header
+- **Student report** — look up any student by name to see their attendance history for their own subject only
+- **Subject isolation** — each teacher sees only their own subject's data across all views (daily list, interval report, student report)
+- **Export Excel** — download attendance data as .xlsx (daily list, interval report, student report)
 - **Export PDF** — download print-ready PDF reports with school header, teacher name, formatted tables (daily list, interval report, student report)
 - **Print** — direct browser print of the daily attendance list
 - **Edit & delete records** — teachers can correct or remove individual attendance entries
 - **Mobile sidebar** — hamburger menu with navigation tabs, lock toggle, dark mode switch, and logout
 
 ### Admin Panel (`/admin`)
-- **Teacher management** — add or remove teachers; each teacher has a name, subject, and password
+- **Teacher management** — add, edit, or remove teachers; each teacher has a name, subject, and password
 - **Class management** — add or remove classes from the dropdown shown to students
 - **Student accounts** — view all registered student accounts, send password reset emails, delete profiles
+- **Audit log** — chronological activity log of all admin actions (add/edit/delete teacher, add/delete class, delete student, password resets, admin password changes) stored in Firestore and viewable in the Audit tab
 - **Admin password** — change the admin panel password (stored in Firestore)
+- **Full data access** — admin sees attendance data across all teachers and subjects
 
 ### General
 - **PWA** — installable as a native app on Android and iOS (Add to Home Screen)
@@ -102,6 +106,9 @@ service cloud.firestore {
     match /students/{uid} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /audit_log/{doc} {
+      allow read, write: if true;
     }
   }
 }
