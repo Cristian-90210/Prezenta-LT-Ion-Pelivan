@@ -3,12 +3,15 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Teacher } from '../teachers';
 
-export function useAttendanceNotifications(teachers: Teacher[]) {
+export function useAttendanceNotifications(
+  teachers: Teacher[],
+  permission: NotificationPermission,
+) {
   const prevLockRef = useRef<Record<string, boolean> | null>(null);
 
   useEffect(() => {
     if (!('Notification' in window)) return;
-    if (Notification.permission !== 'granted') return;
+    if (permission !== 'granted') return;
     if (teachers.length === 0) return;
 
     const unsub = onSnapshot(doc(db, 'settings', 'lock'), snap => {
@@ -47,5 +50,5 @@ export function useAttendanceNotifications(teachers: Teacher[]) {
     });
 
     return () => unsub();
-  }, [teachers]);
+  }, [teachers, permission]);
 }

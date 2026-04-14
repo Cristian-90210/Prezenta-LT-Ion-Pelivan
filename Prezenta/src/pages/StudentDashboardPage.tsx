@@ -104,7 +104,7 @@ export default function StudentDashboardPage() {
     setNotifDismissed(true);
   }
 
-  useAttendanceNotifications(teachers);
+  useAttendanceNotifications(teachers, notifPermission);
 
   // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
   useEffect(() => {
