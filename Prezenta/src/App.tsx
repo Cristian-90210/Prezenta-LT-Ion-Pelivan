@@ -8,8 +8,8 @@ import './App.css';
 
 function StudentRouter() {
   const { user, loading } = useAuth();
-  // Arată login imediat; dacă Firebase confirmă sesiunea, trece automat la dashboard
-  if (loading || !user) return <AuthPage />;
+  if (loading) return null;
+  if (!user) return <AuthPage />;
   return <StudentDashboardPage />;
 }
 
