@@ -76,11 +76,11 @@ public/
 
 ## How it works
 
-1. The **administrator** goes to `/admin`, adds the school's teachers and classes
-2. The **teacher** goes to `/teacher`, logs in with their password and opens the session
-3. The **teacher** displays the QR code on the projector (general or per-class)
-4. **Students** scan the QR with their phone, enter their name and press "Mark Attendance"
-5. The **teacher** sees the list update in real time and can export or print at the end
+1.The administrator accesses the administration section, adds the school's teachers and classes
+2.The teacher logs in to the dedicated teacher interface with their password and starts the attendance session
+3.The teacher displays the QR code on the projector (general or per-class)
+4.Students scan the QR code with their phone, enter their name and press "Mark Attendance"
+5.The teacher sees the list update in real time and can export or print the attendance at the end
 
 ---
 
