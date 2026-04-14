@@ -1762,6 +1762,25 @@ html, body, #root {
   justify-content: center;
 }
 
+/* Ține-mă minte */
+.remember-me-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  user-select: none;
+}
+.remember-me-check {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--indigo);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 /* Reset parolă — ecran succes */
 .reset-success {
   display: flex;

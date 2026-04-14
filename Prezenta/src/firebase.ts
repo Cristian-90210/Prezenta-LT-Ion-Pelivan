@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth, browserSessionPersistence, setPersistence } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,3 +21,5 @@ export const db = initializeFirestore(app, {
 });
 
 export const auth = getAuth(app);
+// Sesiunea se păstrează doar cât timp tab-ul e deschis — la redeschiderea aplicației necesită logare
+setPersistence(auth, browserSessionPersistence).catch(() => {});
