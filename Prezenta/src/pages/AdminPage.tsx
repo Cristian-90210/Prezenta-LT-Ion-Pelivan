@@ -59,6 +59,13 @@ export default function AdminPage() {
   const [newAdminPass, setNewAdminPass] = useState('');
   const [passMsg, setPassMsg] = useState('');
 
+  // Edit teacher modal
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [editName, setEditName]         = useState('');
+  const [editSubject, setEditSubject]   = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editTeacherError, setEditTeacherError] = useState('');
+
   // Students tab
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
@@ -159,6 +166,31 @@ export default function AdminPage() {
 
   async function handleDeleteTeacher(id: string) {
     await saveTeachers(teachers.filter(t => t.id !== id));
+  }
+
+  function openEditTeacher(t: Teacher) {
+    setEditingTeacher(t);
+    setEditName(t.name);
+    setEditSubject(t.subject);
+    setEditPassword(t.password);
+    setEditTeacherError('');
+  }
+
+  async function handleSaveEditTeacher(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingTeacher) return;
+    const name    = editName.trim();
+    const subject = editSubject.trim();
+    const pass    = editPassword.trim();
+    if (!name || !subject || !pass) {
+      setEditTeacherError('Toate câmpurile sunt obligatorii.');
+      return;
+    }
+    const updated = teachers.map(t =>
+      t.id === editingTeacher.id ? { ...t, name, subject, password: pass } : t
+    );
+    await saveTeachers(updated);
+    setEditingTeacher(null);
   }
 
   async function handleAddClass(e: React.FormEvent) {
@@ -463,7 +495,16 @@ export default function AdminPage() {
                       <td>{t.name}</td>
                       <td><span className="badge">{t.subject}</span></td>
                       <td className="td-ip">{t.password}</td>
-                      <td>
+                      <td style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          className="btn-action"
+                          onClick={() => openEditTeacher(t)}
+                          disabled={saving}
+                          title="Editează profesor"
+                          style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                        >
+                          ✏️
+                        </button>
                         <button
                           className="btn-delete"
                           onClick={() => handleDeleteTeacher(t.id)}
@@ -740,6 +781,63 @@ export default function AdminPage() {
 
       </main>
       </div>
+
+      {/* ══ Modal editare profesor ══ */}
+      {editingTeacher && (
+        <div className="modal-overlay" onClick={() => setEditingTeacher(null)}>
+          <div className="crop-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="crop-modal-header">
+              <span className="crop-modal-title">Editează profesor</span>
+              <button className="qr-zoom-close" onClick={() => setEditingTeacher(null)}>✕</button>
+            </div>
+            <form onSubmit={handleSaveEditTeacher} className="crop-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '20px 24px' }}>
+              <div className="field">
+                <label>Nume afișat</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  placeholder="ex: Prof. Matematică"
+                  autoFocus
+                  disabled={saving}
+                />
+              </div>
+              <div className="field">
+                <label>Materia predată</label>
+                <input
+                  type="text"
+                  value={editSubject}
+                  onChange={e => setEditSubject(e.target.value)}
+                  placeholder="ex: Matematică"
+                  disabled={saving}
+                />
+              </div>
+              <div className="field">
+                <label>Parolă</label>
+                <input
+                  type="text"
+                  value={editPassword}
+                  onChange={e => setEditPassword(e.target.value)}
+                  placeholder="ex: mate2025"
+                  disabled={saving}
+                />
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                ID-ul profesorului (<code style={{ background: 'var(--gray-100)', padding: '1px 5px', borderRadius: 4 }}>{editingTeacher.id}</code>) nu se poate schimba.
+              </p>
+              {editTeacherError && <p className="error-msg">{editTeacherError}</p>}
+              <div className="crop-modal-footer" style={{ padding: 0, marginTop: 4 }}>
+                <button type="button" className="btn-cancel-sm" style={{ padding: '10px 24px' }} onClick={() => setEditingTeacher(null)}>
+                  Anulează
+                </button>
+                <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '10px 28px', background: '#7c3aed' }} disabled={saving}>
+                  {saving ? 'Se salvează...' : 'Salvează'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
