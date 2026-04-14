@@ -1,4 +1,4 @@
-# Prezență — Liceul Teoretic Ion Pelivan
+# Prezență — Liceul Teoretic "Ion Pelivan"
 
 A web application for **digital attendance tracking**, built with React, TypeScript, and Firebase Firestore. Teachers generate unique QR codes that students scan to mark their attendance in real time.
 
@@ -12,7 +12,7 @@ A web application for **digital attendance tracking**, built with React, TypeScr
 - **Anti-duplicate protection** — a student cannot mark attendance twice on the same day for the same subject
 - **Dark mode** — light/dark interface toggle
 
-### For teachers (`/teacher`)
+### For teachers 
 - **Per-teacher password login** — each teacher/subject has its own password
 - **Real-time attendance list** — updates instantly as students scan the QR code
 - **Filter and search** — by class, date, or student name
@@ -26,7 +26,7 @@ A web application for **digital attendance tracking**, built with React, TypeScr
 - **Interval report** — enter a date range and get each student's frequency in that period, plus a day-by-day breakdown; CSV export with two sections (frequency + detail)
 - **Student report** — search a student by name and see all their attendances across **all subjects**, grouped with per-subject summary cards and a full chronological table; CSV export
 
-### Admin panel (`/admin`)
+### Admin panel 
 - **Teacher management** — add or delete teachers directly from the UI without touching the code; changes propagate live to all open pages
 - **Class management** — add or delete classes (including custom ones like `IX-D`, `X-INFO`); live propagation
 - **Change admin password** — password stored in Firestore, not in the source code
