@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useConfig } from '../hooks/useConfig';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useStudentPhoto } from '../hooks/useProfilePhoto';
+import { useAttendanceNotifications } from '../hooks/useAttendanceNotifications';
 import CropModal from '../components/CropModal';
 
 interface StudentProfile {
@@ -79,6 +80,31 @@ export default function StudentDashboardPage() {
   // Foto pending (crop confirmat dar nesalvat încă)
   const [pendingPhoto, setPendingPhoto]   = useState<string | null>(null);
   const [cropFile,     setCropFile]       = useState<File | null>(null);
+
+  // ── Notificări push ───────────────────────────────────────────────────────
+  const notifSupported = typeof window !== 'undefined' && 'Notification' in window;
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
+    notifSupported ? Notification.permission : 'denied'
+  );
+  const [notifDismissed, setNotifDismissed] = useState(
+    () => localStorage.getItem('notifDismissed') === 'true'
+  );
+
+  async function requestNotifPermission() {
+    const result = await Notification.requestPermission();
+    setNotifPermission(result);
+    if (result === 'denied') {
+      localStorage.setItem('notifDismissed', 'true');
+      setNotifDismissed(true);
+    }
+  }
+
+  function dismissNotifBanner() {
+    localStorage.setItem('notifDismissed', 'true');
+    setNotifDismissed(true);
+  }
+
+  useAttendanceNotifications(teachers);
 
   // ── Auto-logout după 10 minute (persistent prin sessionStorage) ──────────
   useEffect(() => {
@@ -485,6 +511,56 @@ export default function StudentDashboardPage() {
           </button>
         </div>
       </header>
+
+      {/* ── Banner notificări ── */}
+      {notifSupported && notifPermission === 'default' && !notifDismissed && (
+        <div style={{
+          background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+          color: '#fff',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          fontSize: '0.85rem',
+          flexWrap: 'wrap',
+        }}>
+          <span style={{ flex: 1 }}>
+            🔔 Activează notificările pentru a fi anunțat când profesorul deschide prezența.
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={requestNotifPermission}
+              style={{
+                background: '#fff', color: '#2563eb', border: 'none',
+                borderRadius: 6, padding: '5px 14px', fontWeight: 700,
+                cursor: 'pointer', fontSize: '0.82rem',
+              }}
+            >
+              Activează
+            </button>
+            <button
+              onClick={dismissNotifBanner}
+              style={{
+                background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.5)',
+                borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem',
+              }}
+            >
+              Nu acum
+            </button>
+          </div>
+        </div>
+      )}
+
+      {notifSupported && notifPermission === 'granted' && !notifDismissed && (
+        <div style={{
+          background: '#f0fdf4', color: '#16a34a', padding: '8px 16px',
+          fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 8,
+        }}
+          onClick={() => setNotifDismissed(true)}
+        >
+          ✓ Notificări activate — vei fi anunțat când prezența se deschide sau se închide.
+        </div>
+      )}
 
       <div className="teacher-body">
 
