@@ -86,6 +86,16 @@ export default function AdminPage() {
   const [newAdminPass, setNewAdminPass] = useState('');
   const [passMsg, setPassMsg] = useState('');
 
+  // Vizibilitate parolă în tabel
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  function togglePasswordVisibility(id: string) {
+    setVisiblePasswords(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
   // Edit teacher modal
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [editName, setEditName]         = useState('');
@@ -558,7 +568,21 @@ export default function AdminPage() {
                       <td className="td-ip">{t.id}</td>
                       <td>{t.name}</td>
                       <td><span className="badge">{t.subject}</span></td>
-                      <td className="td-ip">{t.password}</td>
+                      <td className="td-ip">
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: 'monospace' }}>
+                            {visiblePasswords.has(t.id) ? t.password : '••••••••'}
+                          </span>
+                          <button
+                            className="btn-edit"
+                            onClick={() => togglePasswordVisibility(t.id)}
+                            title={visiblePasswords.has(t.id) ? 'Ascunde parola' : 'Arată parola'}
+                            style={{ fontSize: '0.85rem', padding: '2px 6px' }}
+                          >
+                            {visiblePasswords.has(t.id) ? '🙈' : '👁'}
+                          </button>
+                        </span>
+                      </td>
                       <td style={{ display: 'flex', gap: 6 }}>
                         <button
                           className="btn-action"
@@ -947,12 +971,12 @@ export default function AdminPage() {
                 />
               </div>
               <div className="field">
-                <label>Parolă</label>
+                <label>Parolă nouă <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(lasă gol pentru a păstra actuala)</span></label>
                 <input
                   type="text"
                   value={editPassword}
                   onChange={e => setEditPassword(e.target.value)}
-                  placeholder="ex: mate2025"
+                  placeholder="Introduceți doar dacă doriți să schimbați"
                   disabled={saving}
                 />
               </div>
