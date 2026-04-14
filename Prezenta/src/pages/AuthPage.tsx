@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   sendEmailVerification, sendPasswordResetEmail,
   signInWithPopup, GoogleAuthProvider,
+  browserLocalPersistence, browserSessionPersistence, setPersistence,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -34,6 +35,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === 'true');
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
   useEffect(() => {
@@ -45,6 +47,16 @@ export default function AuthPage() {
     setMode(m);
     setError('');
     setResetSent(false);
+  }
+
+  function handleRememberChange(val: boolean) {
+    setRememberMe(val);
+    localStorage.setItem('rememberMe', String(val));
+  }
+
+  async function applyPersistence() {
+    const p = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+    await setPersistence(auth, p);
   }
 
   async function handleReset(e: React.FormEvent) {
@@ -66,6 +78,7 @@ export default function AuthPage() {
     setError('');
     setLoading(true);
     try {
+      await applyPersistence();
       const provider = new GoogleAuthProvider();
       const cred = await signInWithPopup(auth, provider);
       // Dacă e utilizator nou, creăm profilul din datele Google
@@ -97,6 +110,7 @@ export default function AuthPage() {
     if (!email.trim() || !password) { setError('Completează toate câmpurile.'); return; }
     setLoading(true);
     try {
+      await applyPersistence();
       await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
     } catch (err: any) {
       setError(authErrorMsg(err.code));
@@ -273,6 +287,15 @@ export default function AuthPage() {
                   />
                 </div>
                 {error && <p className="error-msg">{error}</p>}
+                <label className="remember-me-row">
+                  <input
+                    type="checkbox"
+                    className="remember-me-check"
+                    checked={rememberMe}
+                    onChange={e => handleRememberChange(e.target.checked)}
+                  />
+                  <span>Ține-mă minte</span>
+                </label>
                 <button type="submit" className="btn-primary" disabled={loading}>
                   {loading ? 'Se conectează...' : 'Conectare'}
                 </button>
