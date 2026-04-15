@@ -956,6 +956,30 @@ html, body, #root {
 .attendance-table tr:last-child td { border-bottom: none; }
 .attendance-table tr:hover td { background: var(--indigo-light); }
 
+/* Sortable column headers */
+.attendance-table th.th-sort {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.attendance-table th.th-sort:hover {
+  background: var(--indigo-light);
+  color: var(--indigo);
+}
+.sort-icon {
+  display: inline-block;
+  font-style: normal;
+  margin-left: 4px;
+  font-size: 0.8em;
+  opacity: 0.55;
+  vertical-align: middle;
+}
+.attendance-table th.th-sort:hover .sort-icon,
+.attendance-table th.th-sort:focus .sort-icon {
+  opacity: 1;
+}
+
 .td-nr { color: var(--text-muted); font-size: 0.85rem; width: 40px; }
 .td-time { color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; font-weight: 600; }
 .td-ip { color: var(--text-muted); font-size: 0.78rem; font-family: monospace; white-space: nowrap; }
