@@ -22,7 +22,7 @@ export default function StudentPage() {
   const [validationError, setValidationError] = useState('');
   const [locked, setLocked] = useState(false);
   const [lockLoading, setLockLoading] = useState(!!teacher);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') !== 'false');
 
   const today = new Date().toISOString().split('T')[0];
 

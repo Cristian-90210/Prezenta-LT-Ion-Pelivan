@@ -73,7 +73,7 @@ export default function StudentDashboardPage() {
   const [profileMsg, setProfileMsg]     = useState('');
 
   const isOnline = useOnlineStatus();
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const { photoURL, saving: photoSaving, error: photoError, savePhoto } = useStudentPhoto(user?.uid);
 
   // Foto pending (crop confirmat dar nesalvat încă)
