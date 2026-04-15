@@ -1418,7 +1418,7 @@ export default function TeacherPage() {
                             <td><span className="badge">{r.clasa}</span></td>
                             <td>
                               {r.materie
-                                ? <span className="badge" style={{ background: 'var(--green-light)', color: 'var(--green)' }}>{r.materie}</span>
+                                ? <span className="badge badge--success">{r.materie}</span>
                                 : <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
                               }
                             </td>
