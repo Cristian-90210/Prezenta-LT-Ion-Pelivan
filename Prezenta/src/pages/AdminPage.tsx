@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { TEACHERS, type Teacher } from '../teachers';
 import { useConfig, DEFAULT_CLASSES } from '../hooks/useConfig';
+import { useSort } from '../hooks/useSort';
 import { logAudit } from '../utils/auditLog';
 import type { AuditAction } from '../utils/auditLog';
 
@@ -115,11 +116,23 @@ export default function AdminPage() {
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
+  // ── Sortare tabele ────────────────────────────────────────────────────────
+  const teachersSort = useSort(teachers, 'name', 'asc');
+
+  const filteredStudents = useMemo(() => students.filter(s => {
+    const q = studentSearch.toLowerCase();
+    return !q || s.prenume.toLowerCase().includes(q) ||
+      s.nume.toLowerCase().includes(q) ||
+      s.clasa.toLowerCase().includes(q) ||
+      s.email.toLowerCase().includes(q);
+  }), [students, studentSearch]);
+  const studentsSort = useSort(filteredStudents, 'prenume', 'asc');
+
   // Mobile sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Dark mode
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') !== 'false');
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('darkMode', String(darkMode));
@@ -555,15 +568,15 @@ export default function AdminPage() {
               <table className="attendance-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Nume afișat</th>
-                    <th>Materie</th>
+                    <th className="th-sort" onClick={() => teachersSort.toggle('id')}>ID <span className="sort-icon">{teachersSort.icon('id')}</span></th>
+                    <th className="th-sort" onClick={() => teachersSort.toggle('name')}>Nume afișat <span className="sort-icon">{teachersSort.icon('name')}</span></th>
+                    <th className="th-sort" onClick={() => teachersSort.toggle('subject')}>Materie <span className="sort-icon">{teachersSort.icon('subject')}</span></th>
                     <th>Parolă</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {teachers.map(t => (
+                  {teachersSort.sorted.map(t => (
                     <tr key={t.id}>
                       <td className="td-ip">{t.id}</td>
                       <td>{t.name}</td>
@@ -738,22 +751,14 @@ export default function AdminPage() {
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Nume</th>
-                      <th>Clasă</th>
-                      <th>Email</th>
+                      <th className="th-sort" onClick={() => studentsSort.toggle('prenume')}>Nume <span className="sort-icon">{studentsSort.icon('prenume')}</span></th>
+                      <th className="th-sort" onClick={() => studentsSort.toggle('clasa')}>Clasă <span className="sort-icon">{studentsSort.icon('clasa')}</span></th>
+                      <th className="th-sort" onClick={() => studentsSort.toggle('email')}>Email <span className="sort-icon">{studentsSort.icon('email')}</span></th>
                       <th>Acțiuni</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {students
-                      .filter(s => {
-                        const q = studentSearch.toLowerCase();
-                        return !q || s.prenume.toLowerCase().includes(q) ||
-                          s.nume.toLowerCase().includes(q) ||
-                          s.clasa.toLowerCase().includes(q) ||
-                          s.email.toLowerCase().includes(q);
-                      })
-                      .map((s, i) => (
+                    {studentsSort.sorted.map((s, i) => (
                         <tr key={s.uid}>
                           <td className="td-nr">{i + 1}</td>
                           <td><strong>{s.prenume} {s.nume}</strong></td>

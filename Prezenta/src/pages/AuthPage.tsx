@@ -36,7 +36,7 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === 'true');
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') !== 'false');
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);

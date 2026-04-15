@@ -22,7 +22,7 @@ export default function PrezentaMeaPage() {
   const [searched, setSearched] = useState(false);
   const [records, setRecords] = useState<AttRec[]>([]);
   const [error, setError] = useState('');
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') !== 'false');
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);

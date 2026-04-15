@@ -47,7 +47,7 @@ export default function TeacherPage() {
   const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(getStoredTeacher);
 
   // ── Dark mode ─────────────────────────────────────────────────────────────
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') !== 'false');
 
   // ── Dashboard data ────────────────────────────────────────────────────────
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
