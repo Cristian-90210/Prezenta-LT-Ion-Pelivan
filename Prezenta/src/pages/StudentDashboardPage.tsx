@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { signOut, sendEmailVerification } from 'firebase/auth';
 import {
@@ -39,7 +39,6 @@ function buildDocId(prenume: string, nume: string, clasa: string, data: string, 
 const TAB_ITEMS: { id: StudentTab; icon: string; label: string }[] = [
   { id: 'scan',    icon: '📷', label: 'Scanează QR' },
   { id: 'istoric', icon: '📋', label: 'Prezența mea' },
-  { id: 'profil',  icon: '👤', label: 'Profilul meu' },
 ];
 
 export default function StudentDashboardPage() {
@@ -59,6 +58,7 @@ export default function StudentDashboardPage() {
   const [regState, setRegState]       = useState<RegState>('idle');
   const [dashTab, setDashTab]         = useState<StudentTab>('scan');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [filterMaterie, setFilterMaterie] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const scannerRef = useRef<any>(null);
 
@@ -289,13 +289,79 @@ export default function StudentDashboardPage() {
   }, [scannerOpen]);
 
   // ── Date derivate pentru statistici ─────────────────────────────────────
-  const bySubject = records.reduce<{ [k: string]: number }>((acc, r) => {
+  const bySubject = useMemo(() => records.reduce<{ [k: string]: number }>((acc, r) => {
     const key = r.materie || 'Nespecificat';
     acc[key] = (acc[key] || 0) + 1;
     return acc;
-  }, {});
+  }, {}), [records]);
   const subjectEntries = Object.entries(bySubject).sort((a, b) => b[1] - a[1]);
   const maxCount = subjectEntries.length > 0 ? Math.max(...subjectEntries.map(([, c]) => c)) : 1;
+
+  // Filtrare
+  const filteredRecords = useMemo(() =>
+    filterMaterie ? records.filter(r => r.materie === filterMaterie) : records,
+    [records, filterMaterie]
+  );
+
+  // Statistici lunare (din înregistrările filtrate)
+  const byMonth = useMemo(() => {
+    const map: { [k: string]: number } = {};
+    filteredRecords.forEach(r => {
+      if (!r.data) return;
+      const [yr, mo] = r.data.split('-');
+      const key = `${yr}-${mo}`;
+      map[key] = (map[key] || 0) + 1;
+    });
+    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredRecords]);
+  const maxMonthCount = byMonth.length > 0 ? Math.max(...byMonth.map(([, c]) => c)) : 1;
+
+  // Export PDF
+  async function exportPDF() {
+    if (!profile) return;
+    const { jsPDF } = await import('jspdf');
+    const autoTable = (await import('jspdf-autotable')).default;
+    const doc2 = new jsPDF();
+
+    // Antet
+    doc2.setFontSize(16);
+    doc2.setFont('helvetica', 'bold');
+    doc2.text('Liceul Teoretic Ion Pelivan', 105, 18, { align: 'center' });
+    doc2.setFontSize(12);
+    doc2.setFont('helvetica', 'normal');
+    doc2.text('Foaie de prezenta', 105, 26, { align: 'center' });
+
+    // Info elev
+    doc2.setFontSize(10);
+    doc2.text(`Elev: ${profile.prenume} ${profile.nume}`, 14, 38);
+    doc2.text(`Clasa: ${profile.clasa}`, 14, 45);
+    doc2.text(`Email: ${profile.email}`, 14, 52);
+    if (filterMaterie) doc2.text(`Materie: ${filterMaterie}`, 14, 59);
+    doc2.text(`Total prezente: ${filteredRecords.length}`, 14, filterMaterie ? 66 : 59);
+
+    const startY = filterMaterie ? 74 : 67;
+
+    const rows = filteredRecords.map(r => [
+      new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', {
+        weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
+      }),
+      r.materie || '—',
+      r.clasa,
+      r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+    ]);
+
+    autoTable(doc2, {
+      head: [['Data', 'Materie', 'Clasa', 'Ora']],
+      body: rows,
+      startY,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [240, 245, 255] },
+    });
+
+    const safeName = `${profile.prenume}_${profile.nume}`.replace(/\s+/g, '_');
+    doc2.save(`prezenta_${safeName}.pdf`);
+  }
 
   const fmtDate = (d: string) =>
     new Date(d + 'T12:00:00').toLocaleDateString('ro-RO', {
@@ -661,13 +727,61 @@ export default function StudentDashboardPage() {
               </>
             )}
 
-            {/* Istoric */}
+            {/* Statistici lunare */}
+            {byMonth.length > 0 && (
+              <>
+                <div className="sd-section-title">Statistici lunare</div>
+                <div className="sd-subjects-card">
+                  {byMonth.map(([ym, count]) => {
+                    const [yr, mo] = ym.split('-');
+                    const label = new Date(Number(yr), Number(mo) - 1, 1)
+                      .toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+                    return (
+                      <div className="pm-subject-row" key={ym}>
+                        <span className="pm-subject-name" style={{ minWidth: 130 }}>{label}</span>
+                        <div className="pm-subject-bar-track">
+                          <div className="pm-subject-bar-fill sd-month-bar" style={{ width: `${(count / maxMonthCount) * 100}%` }} />
+                        </div>
+                        <span className="pm-subject-count">{count} {count === 1 ? 'zi' : 'zile'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* Filtrare + Export */}
             <div className="sd-section-title">
               Istoricul detaliat
               {records.length > 0 && (
-                <span className="sd-total-badge">{records.length} total</span>
+                <span className="sd-total-badge">{filteredRecords.length}{filterMaterie ? ` / ${records.length}` : ''} total</span>
               )}
             </div>
+
+            {records.length > 0 && (
+              <div className="sd-filter-row">
+                <div className="sd-filter-pills">
+                  <button
+                    className={`sd-filter-pill${filterMaterie === '' ? ' active' : ''}`}
+                    onClick={() => setFilterMaterie('')}
+                  >
+                    Toate
+                  </button>
+                  {subjectEntries.map(([subject]) => (
+                    <button
+                      key={subject}
+                      className={`sd-filter-pill${filterMaterie === subject ? ' active' : ''}`}
+                      onClick={() => setFilterMaterie(subject)}
+                    >
+                      {subject}
+                    </button>
+                  ))}
+                </div>
+                <button className="sd-export-btn" onClick={exportPDF} title="Descarcă PDF">
+                  ⬇ PDF
+                </button>
+              </div>
+            )}
 
             {recordsLoading ? (
               <div className="sd-loading-text">Se încarcă istoricul...</div>
@@ -676,15 +790,19 @@ export default function StudentDashboardPage() {
                 Nicio prezență înregistrată încă.<br />
                 Mergi la „Scanează QR" pentru a începe.
               </div>
+            ) : filteredRecords.length === 0 ? (
+              <div className="empty-state">
+                Nicio prezență pentru materia selectată.
+              </div>
             ) : (
               <div className="pm-records sd-history-card">
-                {records.map(r => (
+                {filteredRecords.map(r => (
                   <div className="pm-record-row" key={r.id}>
                     <div className="pm-record-date">{fmtDate(r.data)}</div>
                     <div className="pm-record-badges">
                       <span className="badge">{r.clasa}</span>
                       {r.materie && (
-                        <span className="badge" style={{ background: 'var(--green-light)', color: 'var(--green)' }}>
+                        <span className="badge badge--success">
                           {r.materie}
                         </span>
                       )}

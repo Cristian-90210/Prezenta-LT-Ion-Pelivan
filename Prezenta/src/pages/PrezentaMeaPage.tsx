@@ -209,7 +209,7 @@ export default function PrezentaMeaPage() {
               <div className="pm-record-badges">
                 <span className="badge">{r.clasa}</span>
                 {r.materie && (
-                  <span className="badge" style={{ background: 'var(--green-light)', color: 'var(--green)' }}>
+                  <span className="badge badge--success">
                     {r.materie}
                   </span>
                 )}

@@ -455,7 +455,7 @@ export default function AdminPage() {
             <div className="tsf-avatar">🛡</div>
             <div className="tsf-info">
               <span className="tsf-name">Administrator</span>
-              <span className="tsf-badge" style={{ color: '#7c3aed', background: '#ede9fe' }}>Admin</span>
+              <span className="tsf-badge badge--purple">Admin</span>
             </div>
           </div>
 

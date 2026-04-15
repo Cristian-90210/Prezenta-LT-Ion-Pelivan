@@ -54,6 +54,31 @@
 
   --header-gradient: linear-gradient(135deg, hsl(238,75%,50%) 0%, hsl(262,70%,56%) 100%);
   --page-gradient:   linear-gradient(150deg, hsl(228,60%,97%) 0%, hsl(248,50%,98%) 50%, hsl(210,50%,97%) 100%);
+
+  /* ── Badge tokens (light) ── */
+  --badge-info-bg:        hsl(238, 100%, 96%);
+  --badge-info-text:      hsl(238, 75%,  44%);
+  --badge-info-border:    hsl(238, 75%,  88%);
+
+  --badge-success-bg:     hsl(172, 60%,  91%);
+  --badge-success-text:   hsl(172, 66%,  26%);
+  --badge-success-border: hsl(172, 50%,  80%);
+
+  --badge-warning-bg:     hsl(38,  100%, 92%);
+  --badge-warning-text:   hsl(38,  80%,  30%);
+  --badge-warning-border: hsl(38,  80%,  78%);
+
+  --badge-danger-bg:      hsl(355, 100%, 96%);
+  --badge-danger-text:    hsl(355, 78%,  42%);
+  --badge-danger-border:  hsl(355, 70%,  86%);
+
+  --badge-neutral-bg:     hsl(228, 20%,  93%);
+  --badge-neutral-text:   hsl(228, 20%,  38%);
+  --badge-neutral-border: hsl(228, 16%,  82%);
+
+  --badge-purple-bg:      hsl(262, 100%, 96%);
+  --badge-purple-text:    hsl(262, 60%,  44%);
+  --badge-purple-border:  hsl(262, 70%,  86%);
 }
 
 /* ── Dark mode ── */
@@ -82,6 +107,31 @@
   --shadow:    0 4px 28px hsla(238,60%,4%,0.40);
   --shadow-sm: 0 2px 8px  hsla(238,60%,4%,0.28);
   --shadow-lg: 0 12px 48px hsla(238,60%,4%,0.55);
+
+  /* ── Badge tokens (dark — contrast ≥ 4.5:1) ── */
+  --badge-info-bg:        hsl(238, 35%, 24%);
+  --badge-info-text:      hsl(238, 90%, 82%);
+  --badge-info-border:    hsl(238, 45%, 34%);
+
+  --badge-success-bg:     hsl(172, 35%, 18%);
+  --badge-success-text:   hsl(172, 70%, 72%);
+  --badge-success-border: hsl(172, 45%, 28%);
+
+  --badge-warning-bg:     hsl(38,  35%, 18%);
+  --badge-warning-text:   hsl(38,  95%, 72%);
+  --badge-warning-border: hsl(38,  50%, 30%);
+
+  --badge-danger-bg:      hsl(355, 35%, 20%);
+  --badge-danger-text:    hsl(355, 80%, 78%);
+  --badge-danger-border:  hsl(355, 50%, 32%);
+
+  --badge-neutral-bg:     hsl(228, 18%, 22%);
+  --badge-neutral-text:   hsl(228, 14%, 76%);
+  --badge-neutral-border: hsl(228, 16%, 30%);
+
+  --badge-purple-bg:      hsl(262, 35%, 24%);
+  --badge-purple-text:    hsl(262, 80%, 82%);
+  --badge-purple-border:  hsl(262, 45%, 34%);
 }
 
 html, body, #root {
@@ -224,6 +274,28 @@ html, body, #root {
 }
 
 .field input:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Date input ── */
+.field input[type="date"] {
+  color-scheme: light;
+}
+.field input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px;
+  filter: invert(31%) sepia(72%) saturate(600%) hue-rotate(218deg) brightness(95%);
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.field input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+:root.dark .field input[type="date"] {
+  color-scheme: dark;
+}
+:root.dark .field input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(70%) sepia(50%) saturate(400%) hue-rotate(210deg) brightness(120%);
+}
 
 /* ── Messages ── */
 .error-msg {
@@ -889,18 +961,58 @@ html, body, #root {
 .td-ip { color: var(--text-muted); font-size: 0.78rem; font-family: monospace; white-space: nowrap; }
 
 /* ── Badge ── */
+/* ══════════════════════════════════════════
+   BADGE DESIGN SYSTEM
+   Base: .badge  |  Variants: .badge--*
+   Sizes:  .badge-lg
+   Types:  info (default) · success · warning
+           danger · neutral · purple
+══════════════════════════════════════════ */
 .badge {
-  display: inline-block;
-  background: var(--indigo-light);
-  color: var(--indigo);
+  display: inline-flex;
+  align-items: center;
+  background:   var(--badge-info-bg);
+  color:        var(--badge-info-text);
+  border:    1px solid var(--badge-info-border);
   border-radius: 999px;
   padding: 3px 11px;
   font-size: 0.8rem;
   font-weight: 800;
-  border: 1px solid var(--indigo-mid);
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 .badge-lg { font-size: 0.95rem; padding: 5px 16px; }
+
+.badge--info {
+  background: var(--badge-info-bg);
+  color:      var(--badge-info-text);
+  border-color: var(--badge-info-border);
+}
+.badge--success {
+  background: var(--badge-success-bg);
+  color:      var(--badge-success-text);
+  border-color: var(--badge-success-border);
+}
+.badge--warning {
+  background: var(--badge-warning-bg);
+  color:      var(--badge-warning-text);
+  border-color: var(--badge-warning-border);
+}
+.badge--danger {
+  background: var(--badge-danger-bg);
+  color:      var(--badge-danger-text);
+  border-color: var(--badge-danger-border);
+}
+.badge--neutral {
+  background: var(--badge-neutral-bg);
+  color:      var(--badge-neutral-text);
+  border-color: var(--badge-neutral-border);
+}
+.badge--purple {
+  background: var(--badge-purple-bg);
+  color:      var(--badge-purple-text);
+  border-color: var(--badge-purple-border);
+}
 
 /* ══════════════════════════════════════════
    STATISTICS
@@ -1347,13 +1459,13 @@ html, body, #root {
 }
 .sidebar-badge {
   display: inline-block;
-  background: var(--indigo-light);
-  color: var(--indigo);
+  background: var(--badge-info-bg);
+  color:      var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
   border-radius: 999px;
   padding: 3px 10px;
   font-size: 0.7rem;
   font-weight: 800;
-  border: 1px solid var(--indigo-mid);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   width: fit-content;
@@ -2069,13 +2181,13 @@ html, body, #root {
   padding: 4px 2px;
 }
 .sd-total-badge {
-  background: var(--indigo-light);
-  color: var(--indigo);
+  background: var(--badge-info-bg);
+  color:      var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
   border-radius: 999px;
   padding: 3px 12px;
   font-size: 0.78rem;
   font-weight: 800;
-  border: 1px solid var(--indigo-mid);
   text-transform: none;
   letter-spacing: 0;
 }
@@ -2098,6 +2210,63 @@ html, body, #root {
   text-align: center;
   padding: 32px;
   font-size: 0.9rem;
+}
+
+/* Luna bar (culoare violet, diferit de barele per materie) */
+.sd-month-bar {
+  background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%) !important;
+}
+
+/* Rândul cu filtre + buton export */
+.sd-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sd-filter-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.sd-filter-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sd-filter-pill:hover {
+  background: var(--indigo-light);
+  color: var(--indigo);
+  border-color: var(--indigo-mid);
+}
+.sd-filter-pill.active {
+  background: var(--indigo);
+  color: #fff;
+  border-color: var(--indigo);
+}
+.sd-export-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  padding: 6px 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.sd-export-btn:hover {
+  background: var(--indigo-light);
+  color: var(--indigo);
+  border-color: var(--indigo-mid);
 }
 
 /* QR scanner modal */
@@ -2388,8 +2557,9 @@ html, body, #root {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--blue);
-  background: var(--blue-light);
+  background: var(--badge-info-bg);
+  color:      var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
   padding: 1px 6px;
   border-radius: 20px;
   display: inline-block;
