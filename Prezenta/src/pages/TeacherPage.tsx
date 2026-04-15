@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   collection, query, where, onSnapshot, deleteDoc, doc,
   getDocs, updateDoc, setDoc,
@@ -9,6 +9,7 @@ import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
 import type { AttendanceRecord } from '../types';
 import { useConfig } from '../hooks/useConfig';
+import { useSort } from '../hooks/useSort';
 import { TEACHERS, type Teacher } from '../teachers';
 import { useTeacherPhoto } from '../hooks/useProfilePhoto';
 import CropModal from '../components/CropModal';
@@ -103,10 +104,6 @@ export default function TeacherPage() {
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeSearched, setRangeSearched] = useState(false);
   const [rangeFilterClasa, setRangeFilterClasa] = useState('');
-  const [rangeSortDir, setRangeSortDir] = useState<'asc' | 'desc'>('desc');
-
-  // ── Sort lista zilnică ─────────────────────────────────────────────────────
-  const [sortOra, setSortOra] = useState<'asc' | 'desc'>('asc');
 
   const { teachers, classes: ALL_CLASSES } = useConfig();
   const siteUrl = window.location.origin;
@@ -372,14 +369,14 @@ export default function TeacherPage() {
           { label: 'Materie', key: 'materie',  type: 'text'                                  },
           { label: 'Ora',     key: 'ora',      type: 'time',   align: 'center', minWidth: 8  },
         ],
-        data: istoricRecords.map((r, i) => ({
+        data: istoricSort.sorted.map((r, i) => ({
           nr:      i + 1,
           data:    r.data,
           clasa:   r.clasa,
           materie: r.materie || '—',
           ora:     r.timestamp.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
         })),
-        totals: { label: 'Total prezențe', value: istoricRecords.length },
+        totals: { label: 'Total prezențe', value: istoricSort.sorted.length },
       }],
     });
   }
@@ -587,12 +584,12 @@ export default function TeacherPage() {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
-    doc.text(`Total prezențe: ${istoricRecords.length}`, 14, 53);
+    doc.text(`Total prezențe: ${istoricSort.sorted.length}`, 14, 53);
 
     autoTable(doc, {
       startY: 60,
       head: [['#', 'Data', 'Clasa', 'Materie', 'Ora']],
-      body: istoricRecords.map((r, i) => [
+      body: istoricSort.sorted.map((r, i) => [
         i + 1,
         new Date(r.data + 'T12:00:00').toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
         r.clasa,
@@ -615,37 +612,39 @@ export default function TeacherPage() {
   }
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const filtered = records
-    .filter(r => {
-      const matchesClasa = !filterClasa || r.clasa === filterClasa;
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        r.prenume.toLowerCase().includes(q) ||
-        r.nume.toLowerCase().includes(q) ||
-        `${r.prenume} ${r.nume}`.toLowerCase().includes(q);
-      return matchesClasa && matchesSearch;
-    })
-    .sort((a, b) => sortOra === 'asc'
-      ? a.timestamp.getTime() - b.timestamp.getTime()
-      : b.timestamp.getTime() - a.timestamp.getTime()
-    );
+  const filteredUnsorted = useMemo(() => records.filter(r => {
+    const matchesClasa = !filterClasa || r.clasa === filterClasa;
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      r.prenume.toLowerCase().includes(q) ||
+      r.nume.toLowerCase().includes(q) ||
+      `${r.prenume} ${r.nume}`.toLowerCase().includes(q);
+    return matchesClasa && matchesSearch;
+  }), [records, filterClasa, searchQuery]);
+
+  const listaSort = useSort(filteredUnsorted, 'timestamp', 'asc');
+  const filtered  = listaSort.sorted;
 
   const statsByClass = ALL_CLASSES
     .map(cls => ({ clasa: cls, count: records.filter(r => r.clasa === cls).length }))
     .filter(s => s.count > 0);
   const maxCount = statsByClass.length > 0 ? Math.max(...statsByClass.map(s => s.count)) : 1;
 
-  const rangeByStudent = Object.values(
+  const rangeByStudentUnsorted = useMemo(() => Object.values(
     rangeRecords.reduce<Record<string, { prenume: string; nume: string; clasa: string; count: number }>>((acc, r) => {
       const key = `${r.prenume}|${r.nume}`;
       if (!acc[key]) acc[key] = { prenume: r.prenume, nume: r.nume, clasa: r.clasa, count: 0 };
       acc[key].count++;
       return acc;
     }, {})
-  )
-  .filter(s => !rangeFilterClasa || s.clasa === rangeFilterClasa)
-  .sort((a, b) => rangeSortDir === 'desc' ? b.count - a.count : a.count - b.count);
+  ).filter(s => !rangeFilterClasa || s.clasa === rangeFilterClasa),
+  [rangeRecords, rangeFilterClasa]);
+
+  const rangeSort      = useSort(rangeByStudentUnsorted, 'count', 'desc');
+  const rangeByStudent = rangeSort.sorted;
+
+  const istoricSort = useSort(istoricRecords, 'data', 'desc');
 
   const qrBaseUrl = `${siteUrl}/?materie=${encodeURIComponent(currentTeacher?.id ?? '')}`;
 
@@ -685,7 +684,6 @@ export default function TeacherPage() {
     { id: 'statistici', icon: '📊', label: 'Statistici' },
     { id: 'raport',     icon: '📅', label: 'Raport interval' },
     { id: 'istoric',    icon: '👤', label: 'Raport elev' },
-    { id: 'profil',     icon: '🧑', label: 'Profilul meu' },
   ];
 
   return (
@@ -1076,13 +1074,6 @@ export default function TeacherPage() {
                     placeholder="Prenume sau Nume..."
                   />
                 </div>
-                <div className="field">
-                  <label>Sortare după Ora</label>
-                  <select value={sortOra} onChange={e => setSortOra(e.target.value as 'asc' | 'desc')}>
-                    <option value="asc">↑ Crescător</option>
-                    <option value="desc">↓ Descrescător</option>
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -1129,10 +1120,10 @@ export default function TeacherPage() {
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Prenume</th>
-                      <th>Nume</th>
-                      <th>Clasa</th>
-                      <th>Ora</th>
+                      <th className="th-sort" onClick={() => listaSort.toggle('prenume')}>Prenume <span className="sort-icon">{listaSort.icon('prenume')}</span></th>
+                      <th className="th-sort" onClick={() => listaSort.toggle('nume')}>Nume <span className="sort-icon">{listaSort.icon('nume')}</span></th>
+                      <th className="th-sort" onClick={() => listaSort.toggle('clasa')}>Clasa <span className="sort-icon">{listaSort.icon('clasa')}</span></th>
+                      <th className="th-sort" onClick={() => listaSort.toggle('timestamp')}>Ora <span className="sort-icon">{listaSort.icon('timestamp')}</span></th>
                       <th className="no-print">IP</th>
                       <th className="no-print"></th>
                     </tr>
@@ -1287,16 +1278,10 @@ export default function TeacherPage() {
                       <thead>
                         <tr>
                           <th>#</th>
-                          <th>Prenume</th>
-                          <th>Nume</th>
-                          <th>Clasa</th>
-                          <th
-                            style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
-                            onClick={() => setRangeSortDir(d => d === 'desc' ? 'asc' : 'desc')}
-                            title="Click pentru a schimba ordinea"
-                          >
-                            Zile prezent {rangeSortDir === 'desc' ? '↓' : '↑'}
-                          </th>
+                          <th className="th-sort" onClick={() => rangeSort.toggle('prenume')}>Prenume <span className="sort-icon">{rangeSort.icon('prenume')}</span></th>
+                          <th className="th-sort" onClick={() => rangeSort.toggle('nume')}>Nume <span className="sort-icon">{rangeSort.icon('nume')}</span></th>
+                          <th className="th-sort" onClick={() => rangeSort.toggle('clasa')}>Clasa <span className="sort-icon">{rangeSort.icon('clasa')}</span></th>
+                          <th className="th-sort" onClick={() => rangeSort.toggle('count')}>Zile prezent <span className="sort-icon">{rangeSort.icon('count')}</span></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1358,7 +1343,7 @@ export default function TeacherPage() {
             {istoricError && <p className="error-msg">{istoricError}</p>}
 
             {istoricSearched && !istoricLoading && (
-              istoricRecords.length === 0 ? (
+              istoricSort.sorted.length === 0 ? (
                 <div className="empty-state">
                   Niciun rezultat pentru „{istoricPrenume} {istoricNume}".
                 </div>
@@ -1367,7 +1352,7 @@ export default function TeacherPage() {
                   {/* Sumar per materie */}
                   <div className="stats-summary">
                     {Object.entries(
-                      istoricRecords.reduce<Record<string, number>>((acc, r) => {
+                      istoricSort.sorted.reduce<Record<string, number>>((acc, r) => {
                         const key = r.materie || 'Nespecificat';
                         acc[key] = (acc[key] || 0) + 1;
                         return acc;
@@ -1382,7 +1367,7 @@ export default function TeacherPage() {
                       ))
                     }
                     <div className="stat-card" style={{ borderTop: '3px solid var(--blue)' }}>
-                      <div className="stat-card-value">{istoricRecords.length}</div>
+                      <div className="stat-card-value">{istoricSort.sorted.length}</div>
                       <div className="stat-card-label">Total prezențe</div>
                     </div>
                   </div>
@@ -1391,7 +1376,7 @@ export default function TeacherPage() {
                     <div className="istoric-result-header">
                       <strong>{istoricPrenume} {istoricNume}</strong>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span className="istoric-count">{istoricRecords.length} prezențe</span>
+                        <span className="istoric-count">{istoricSort.sorted.length} prezențe</span>
                         <button className="btn-action" onClick={exportIstoricXlsx}>⬇ Excel</button>
                         <button className="btn-action btn-pdf" onClick={exportIstoricPDF}>⬇ PDF</button>
                       </div>
@@ -1400,14 +1385,14 @@ export default function TeacherPage() {
                       <thead>
                         <tr>
                           <th>#</th>
-                          <th>Data</th>
-                          <th>Clasa</th>
-                          <th>Materie</th>
-                          <th>Ora</th>
+                          <th className="th-sort" onClick={() => istoricSort.toggle('data')}>Data <span className="sort-icon">{istoricSort.icon('data')}</span></th>
+                          <th className="th-sort" onClick={() => istoricSort.toggle('clasa')}>Clasa <span className="sort-icon">{istoricSort.icon('clasa')}</span></th>
+                          <th className="th-sort" onClick={() => istoricSort.toggle('materie')}>Materie <span className="sort-icon">{istoricSort.icon('materie')}</span></th>
+                          <th className="th-sort" onClick={() => istoricSort.toggle('timestamp')}>Ora <span className="sort-icon">{istoricSort.icon('timestamp')}</span></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {istoricRecords.map((r, i) => (
+                        {istoricSort.sorted.map((r, i) => (
                           <tr key={r.id}>
                             <td className="td-nr">{i + 1}</td>
                             <td>
