@@ -128,6 +128,19 @@ export default function AdminPage() {
   }), [students, studentSearch]);
   const studentsSort = useSort(filteredStudents, 'prenume', 'asc');
 
+  // ── Paginare elevi ────────────────────────────────────────────────────────
+  const STUDENTS_PAGE_SIZE = 50;
+  const [studentsPage, setStudentsPage] = useState(0);
+
+  // Reset la pagina 1 când se schimbă căutarea sau sortarea
+  useEffect(() => { setStudentsPage(0); }, [studentSearch, studentsSort.col, studentsSort.dir]);
+
+  const totalPages = Math.ceil(studentsSort.sorted.length / STUDENTS_PAGE_SIZE);
+  const pagedStudents = studentsSort.sorted.slice(
+    studentsPage * STUDENTS_PAGE_SIZE,
+    (studentsPage + 1) * STUDENTS_PAGE_SIZE,
+  );
+
   // Mobile sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -735,16 +748,8 @@ export default function AdminPage() {
               <div className="attendance-table-wrap">
                 <div className="istoric-result-header">
                   <strong>
-                    {(() => {
-                      const filtered = students.filter(s => {
-                        const q = studentSearch.toLowerCase();
-                        return !q || s.prenume.toLowerCase().includes(q) ||
-                          s.nume.toLowerCase().includes(q) ||
-                          s.clasa.toLowerCase().includes(q) ||
-                          s.email.toLowerCase().includes(q);
-                      });
-                      return `${filtered.length} elev${filtered.length !== 1 ? 'i' : ''} găsit${filtered.length !== 1 ? 'i' : ''}`;
-                    })()}
+                    {studentsSort.sorted.length} elev{studentsSort.sorted.length !== 1 ? 'i' : ''} găsit{studentsSort.sorted.length !== 1 ? 'i' : ''}
+                    {totalPages > 1 && ` · pagina ${studentsPage + 1} din ${totalPages}`}
                   </strong>
                 </div>
                 <table className="attendance-table">
@@ -758,9 +763,9 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {studentsSort.sorted.map((s, i) => (
+                    {pagedStudents.map((s, i) => (
                         <tr key={s.uid}>
-                          <td className="td-nr">{i + 1}</td>
+                          <td className="td-nr">{studentsPage * STUDENTS_PAGE_SIZE + i + 1}</td>
                           <td><strong>{s.prenume} {s.nume}</strong></td>
                           <td><span className="badge">{s.clasa}</span></td>
                           <td className="td-ip">{s.email}</td>
@@ -822,6 +827,42 @@ export default function AdminPage() {
                     )}
                   </tbody>
                 </table>
+
+                {totalPages > 1 && (
+                  <div className="pagination-row">
+                    <button
+                      className="btn-action"
+                      onClick={() => setStudentsPage(0)}
+                      disabled={studentsPage === 0}
+                    >
+                      «
+                    </button>
+                    <button
+                      className="btn-action"
+                      onClick={() => setStudentsPage(p => p - 1)}
+                      disabled={studentsPage === 0}
+                    >
+                      ‹ Anterior
+                    </button>
+                    <span className="pagination-info">
+                      {studentsPage + 1} / {totalPages}
+                    </span>
+                    <button
+                      className="btn-action"
+                      onClick={() => setStudentsPage(p => p + 1)}
+                      disabled={studentsPage >= totalPages - 1}
+                    >
+                      Următor ›
+                    </button>
+                    <button
+                      className="btn-action"
+                      onClick={() => setStudentsPage(totalPages - 1)}
+                      disabled={studentsPage >= totalPages - 1}
+                    >
+                      »
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </>

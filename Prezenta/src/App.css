@@ -484,6 +484,27 @@ html, body, #root {
 }
 .btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ── Pagination ── */
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 0 0 var(--radius) var(--radius);
+  flex-wrap: wrap;
+}
+.pagination-info {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 0 6px;
+  min-width: 60px;
+  text-align: center;
+}
+
 /* ── PDF button ── */
 .btn-pdf {
   color: #dc2626;
