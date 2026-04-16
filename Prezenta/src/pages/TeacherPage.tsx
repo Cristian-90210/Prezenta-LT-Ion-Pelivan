@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   collection, query, where, onSnapshot, deleteDoc, doc,
-  getDocs, updateDoc, setDoc,
+  getDocs, updateDoc, setDoc, getDoc,
 } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { db } from '../firebase';
-import type { AttendanceRecord } from '../types';
+import type { AttendanceRecord, OraDeClasa, Schimbare } from '../types';
 import { useConfig } from '../hooks/useConfig';
 import { useSort } from '../hooks/useSort';
 import { TEACHERS, type Teacher } from '../teachers';
@@ -35,7 +35,7 @@ function getStoredTeacher(): Teacher | null {
 import { exportXlsx } from '../utils/exportXlsx';
 
 type View = 'login' | 'dashboard';
-type DashTab = 'lista' | 'statistici' | 'raport' | 'istoric' | 'profil';
+type DashTab = 'lista' | 'statistici' | 'raport' | 'istoric' | 'orar' | 'profil';
 
 export default function TeacherPage() {
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -57,6 +57,20 @@ export default function TeacherPage() {
   const [fbError, setFbError] = useState('');
   const [fbLoading, setFbLoading] = useState(false);
   const [dashTab, setDashTab] = useState<DashTab>('lista');
+
+  // ── Orar profesor ─────────────────────────────────────────────────────────
+  const ZILE_T    = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri'] as const;
+  const ORE_NR_T  = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+  const DEFAULT_INT_T = ['08:00–08:50','09:00–09:50','10:00–10:50','11:00–11:50',
+                         '12:00–12:50','13:00–13:50','14:00–14:50','15:00–15:50'];
+
+  interface OraProfesor extends OraDeClasa { clasa: string; }
+
+  const [orarProfesor, setOrarProfesor]     = useState<OraProfesor[]>([]);
+  const [orarIntervale, setOrarIntervale]   = useState<string[]>(DEFAULT_INT_T);
+  const [orarLoading, setOrarLoading]       = useState(false);
+  const [schimbari, setSchimbari]           = useState<Schimbare[]>([]);
+  const [schimbariLoading, setSchimbariLoading] = useState(false);
 
   // ── QR ────────────────────────────────────────────────────────────────────
   const [qrVisible, setQrVisible] = useState(false);
@@ -189,6 +203,65 @@ export default function TeacherPage() {
     });
     return () => unsubscribe();
   }, [view, currentTeacher]);
+
+  // ── Load orar profesor + schimbări ────────────────────────────────────────
+  useEffect(() => {
+    if (view !== 'dashboard' || !currentTeacher) return;
+
+    async function load() {
+      setOrarLoading(true);
+      try {
+        // Fetch all class timetables, keep only slots for this teacher
+        const orarSnap = await getDocs(collection(db, 'orar'));
+        const ore: OraProfesor[] = [];
+        orarSnap.forEach(d => {
+          const clasa = d.id;
+          const docOre: OraDeClasa[] = d.data().ore ?? [];
+          docOre
+            .filter(o => o.profesor === currentTeacher!.name)
+            .forEach(o => ore.push({ ...o, clasa }));
+        });
+        setOrarProfesor(ore);
+
+        // Load time intervals
+        const intSnap = await getDoc(doc(db, 'settings', 'orar'));
+        if (intSnap.exists() && intSnap.data().intervale) {
+          setOrarIntervale(
+            intSnap.data().intervale.map(
+              (i: { start: string; sfarsit: string }) => `${i.start}–${i.sfarsit}`
+            )
+          );
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setOrarLoading(false);
+      }
+
+      setSchimbariLoading(true);
+      try {
+        const schSnap = await getDocs(collection(db, 'schimbari'));
+        const list: Schimbare[] = schSnap.docs.map(d => ({
+          id: d.id,
+          data: d.data().data ?? '',
+          clasa: d.data().clasa ?? '',
+          titlu: d.data().titlu ?? '',
+          descriere: d.data().descriere ?? '',
+          materieVeche: d.data().materieVeche,
+          materieNoua: d.data().materieNoua,
+          creatLa: d.data().creatLa?.toDate?.() ?? new Date(),
+        }));
+        list.sort((a, b) => b.creatLa.getTime() - a.creatLa.getTime());
+        setSchimbari(list);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setSchimbariLoading(false);
+      }
+    }
+
+    load();
+  }, [view, currentTeacher]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   function handleLogin(e: React.FormEvent) {
@@ -685,6 +758,7 @@ export default function TeacherPage() {
     { id: 'statistici', icon: '📊', label: 'Statistici' },
     { id: 'raport',     icon: '📅', label: 'Raport interval' },
     { id: 'istoric',    icon: '👤', label: 'Raport elev' },
+    { id: 'orar',       icon: '🗓', label: 'Orar' },
   ];
 
   return (
@@ -1420,6 +1494,116 @@ export default function TeacherPage() {
               )
             )}
           </>
+        )}
+
+        {/* ══════════════ TAB: ORAR ══════════════ */}
+        {dashTab === 'orar' && (
+          <div className="orar-wrap">
+            <h2 className="orar-title">Orarul meu</h2>
+
+            {orarLoading ? (
+              <div className="empty-state">Se încarcă orarul...</div>
+            ) : (
+              <>
+                {orarProfesor.length === 0 ? (
+                  <div className="empty-state">
+                    Nu aveți ore introduse în orar. Contactați administratorul.
+                  </div>
+                ) : (
+                  <div className="orar-table-scroll">
+                    <table className="orar-table">
+                      <thead>
+                        <tr>
+                          <th>Ora</th>
+                          {ZILE_T.map(z => <th key={z}>{z}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ORE_NR_T.map(nr => {
+                          const rowHasData = ZILE_T.some(zi =>
+                            orarProfesor.some(o => o.zi === zi && o.ora === nr)
+                          );
+                          if (!rowHasData) return null;
+                          return (
+                            <tr key={nr}>
+                              <td className="orar-td-nr">
+                                <strong>{nr}</strong>
+                                <span className="orar-interval">
+                                  {orarIntervale[nr - 1] ?? ''}
+                                </span>
+                              </td>
+                              {ZILE_T.map(zi => {
+                                const ora = orarProfesor.find(
+                                  o => o.zi === zi && o.ora === nr
+                                );
+                                return (
+                                  <td key={zi} className="orar-td-cell">
+                                    {ora && (
+                                      <div className="orar-cell-content">
+                                        <span className="orar-materie">{ora.materie}</span>
+                                        <span className="badge">{ora.clasa}</span>
+                                        <span className="orar-cabinet">📍 {ora.cabinet}</span>
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* ── Schimbări ── */}
+                <div style={{ marginTop: '2rem' }}>
+                  <h3 className="orar-title" style={{ fontSize: '1.1rem' }}>
+                    Schimbări în orar
+                  </h3>
+                  {schimbariLoading ? (
+                    <div className="empty-state">Se încarcă...</div>
+                  ) : schimbari.length === 0 ? (
+                    <div className="empty-state">Nu există schimbări înregistrate.</div>
+                  ) : (
+                    <div className="schimbari-list">
+                      {schimbari.map(s => (
+                        <div className="schimbare-card" key={s.id}>
+                          <div className="schimbare-header">
+                            <span className="schimbare-date">
+                              {new Date(s.data + 'T12:00:00').toLocaleDateString('ro-RO', {
+                                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                              })}
+                            </span>
+                            <span className="badge">
+                              {s.clasa === 'Toate clasele' ? 'Toate clasele' : s.clasa}
+                            </span>
+                          </div>
+                          <div className="schimbare-titlu">{s.titlu}</div>
+                          {(s.materieVeche || s.materieNoua) && (
+                            <div className="schimbare-materii">
+                              {s.materieVeche && (
+                                <span className="badge badge--danger">{s.materieVeche}</span>
+                              )}
+                              {s.materieVeche && s.materieNoua && (
+                                <span className="schimbare-arrow">→</span>
+                              )}
+                              {s.materieNoua && (
+                                <span className="badge badge--success">{s.materieNoua}</span>
+                              )}
+                            </div>
+                          )}
+                          {s.descriere && (
+                            <div className="schimbare-desc">{s.descriere}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {/* ══════════════ TAB: PROFILUL MEU ══════════════ */}

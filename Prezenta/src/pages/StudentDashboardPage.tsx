@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { signOut, sendEmailVerification } from 'firebase/auth';
 import {
-  collection, query, where, getDocs, getDoc, orderBy,
+  collection, query, where, getDocs, getDoc,
   doc, setDoc, Timestamp, onSnapshot,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -173,14 +173,14 @@ export default function StudentDashboardPage() {
     setOrarLoading(true);
     Promise.all([
       getDoc(doc(db, 'orar', profile.clasa)),
-      getDocs(query(collection(db, 'schimbari'), orderBy('creatLa', 'desc'))),
+      getDocs(collection(db, 'schimbari')),
       getDoc(doc(db, 'settings', 'orar')),
     ]).then(([orarSnap, schSnap, setSnap]) => {
       setOrarOre(orarSnap.exists() ? (orarSnap.data().ore ?? []) : []);
       if (setSnap.exists() && setSnap.data().intervale) {
         setOreIntervale(setSnap.data().intervale.map((i: {start: string; sfarsit: string}) => `${i.start}–${i.sfarsit}`));
       }
-      setSchimbari(schSnap.docs
+      const schData = schSnap.docs
         .map(d => ({
           id: d.id,
           data: d.data().data ?? '',
@@ -191,8 +191,9 @@ export default function StudentDashboardPage() {
           materieNoua: d.data().materieNoua ?? '',
           creatLa: d.data().creatLa?.toDate() ?? new Date(),
         }))
-        .filter(s => s.clasa === profile.clasa || s.clasa === 'Toate clasele')
-      );
+        .filter(s => s.clasa === profile.clasa || s.clasa === 'Toate clasele');
+      schData.sort((a, b) => b.creatLa.getTime() - a.creatLa.getTime());
+      setSchimbari(schData);
       setOrarLoading(false);
     }).catch(() => setOrarLoading(false));
   }, [dashTab, profile]);
