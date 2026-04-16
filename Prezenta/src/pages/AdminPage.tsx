@@ -146,6 +146,7 @@ export default function AdminPage() {
   const [cellProfesor, setCellProfesor]     = useState('');
   const [cellCabinet, setCellCabinet]       = useState('');
   const [cellSaving, setCellSaving]         = useState(false);
+  const [cellError, setCellError]           = useState('');
 
   const [schimbari, setSchimbari]           = useState<Schimbare[]>([]);
   const [schimbariLoading, setSchimbariLoading] = useState(false);
@@ -257,12 +258,14 @@ export default function AdminPage() {
     setCellMaterie(existing?.materie ?? '');
     setCellProfesor(existing?.profesor ?? '');
     setCellCabinet(existing?.cabinet ?? '');
+    setCellError('');
     setEditCell({ zi, ora });
   }
 
   async function saveCell() {
     if (!editCell || !orarClasa) return;
     setCellSaving(true);
+    setCellError('');
     let newOre: OraDeClasa[];
     const exists = orarOre.find(o => o.zi === editCell.zi && o.ora === editCell.ora);
     if (!cellMaterie.trim()) {
@@ -282,19 +285,28 @@ export default function AdminPage() {
       await setDoc(doc(db, 'orar', orarClasa), { ore: newOre });
       setOrarOre(newOre);
       setEditCell(null);
-    } catch {}
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setCellError(`Eroare la salvare: ${msg}`);
+      console.error('saveCell error:', err);
+    }
     setCellSaving(false);
   }
 
   async function deleteCell() {
     if (!editCell || !orarClasa) return;
     setCellSaving(true);
+    setCellError('');
     const newOre = orarOre.filter(o => !(o.zi === editCell.zi && o.ora === editCell.ora));
     try {
       await setDoc(doc(db, 'orar', orarClasa), { ore: newOre });
       setOrarOre(newOre);
       setEditCell(null);
-    } catch {}
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setCellError(`Eroare la ștergere: ${msg}`);
+      console.error('deleteCell error:', err);
+    }
     setCellSaving(false);
   }
 
@@ -302,8 +314,8 @@ export default function AdminPage() {
   async function loadSchimbari() {
     setSchimbariLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'schimbari'), orderBy('creatLa', 'desc'), limit(100)));
-      setSchimbari(snap.docs.map(d => ({
+      const snap = await getDocs(collection(db, 'schimbari'));
+      const data = snap.docs.map(d => ({
         id: d.id,
         data: d.data().data ?? '',
         clasa: d.data().clasa ?? '',
@@ -312,7 +324,9 @@ export default function AdminPage() {
         materieVeche: d.data().materieVeche ?? '',
         materieNoua: d.data().materieNoua ?? '',
         creatLa: d.data().creatLa?.toDate() ?? new Date(),
-      })));
+      }));
+      data.sort((a, b) => b.creatLa.getTime() - a.creatLa.getTime());
+      setSchimbari(data);
     } catch {}
     setSchimbariLoading(false);
   }
@@ -1153,6 +1167,11 @@ export default function AdminPage() {
                                 />
                               </div>
                             </div>
+                            {cellError && (
+                              <p style={{ color: 'var(--rose)', fontSize: '0.82rem', margin: '4px 0 0' }}>
+                                {cellError}
+                              </p>
+                            )}
                             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                               <button className="btn-primary" onClick={saveCell} disabled={cellSaving} style={{ flex: 1 }}>
                                 {cellSaving ? 'Se salvează...' : '✓ Salvează'}
