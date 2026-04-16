@@ -1143,20 +1143,41 @@ export default function AdminPage() {
                             <div className="control-row" style={{ flexWrap: 'wrap' }}>
                               <div className="field" style={{ flex: '1 1 160px' }}>
                                 <label>Materie</label>
-                                <input
-                                  type="text" value={cellMaterie}
-                                  onChange={e => setCellMaterie(e.target.value)}
-                                  placeholder="ex: Matematică"
+                                <select
+                                  value={cellMaterie}
                                   autoFocus
-                                />
+                                  onChange={e => {
+                                    setCellMaterie(e.target.value);
+                                    // reset profesor dacă nu predă materia nouă
+                                    const prof = teachers.find(t => t.name === cellProfesor);
+                                    if (prof && prof.subject !== e.target.value) setCellProfesor('');
+                                  }}
+                                >
+                                  <option value="">— Alege materia —</option>
+                                  {[...new Set(teachers.map(t => t.subject))].sort((a, b) => a.localeCompare(b, 'ro')).map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="field" style={{ flex: '1 1 160px' }}>
                                 <label>Profesor</label>
-                                <input
-                                  type="text" value={cellProfesor}
-                                  onChange={e => setCellProfesor(e.target.value)}
-                                  placeholder="ex: Ion Popescu"
-                                />
+                                <select
+                                  value={cellProfesor}
+                                  onChange={e => {
+                                    setCellProfesor(e.target.value);
+                                    // auto-completează materia din profilul profesorului
+                                    const prof = teachers.find(t => t.name === e.target.value);
+                                    if (prof) setCellMaterie(prof.subject);
+                                  }}
+                                >
+                                  <option value="">— Alege profesorul —</option>
+                                  {(cellMaterie
+                                    ? teachers.filter(t => t.subject === cellMaterie)
+                                    : teachers
+                                  ).sort((a, b) => a.name.localeCompare(b.name, 'ro')).map(t => (
+                                    <option key={t.id} value={t.name}>{t.name}</option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="field" style={{ flex: '1 1 100px' }}>
                                 <label>Cabinet</label>
