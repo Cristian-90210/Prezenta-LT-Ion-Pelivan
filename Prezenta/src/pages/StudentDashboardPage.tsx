@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { signOut, sendEmailVerification } from 'firebase/auth';
 import {
-  collection, query, where, getDocs, getDoc,
+  collection, query, where, getDocs, getDoc, orderBy,
   doc, setDoc, Timestamp, onSnapshot,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -11,6 +11,7 @@ import { useConfig } from '../hooks/useConfig';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useStudentPhoto } from '../hooks/useProfilePhoto';
 import CropModal from '../components/CropModal';
+import type { OraDeClasa, Schimbare } from '../types';
 
 interface StudentProfile {
   prenume: string;
@@ -28,7 +29,7 @@ interface AttRec {
 }
 
 type RegState = 'idle' | 'checking' | 'ready' | 'submitting' | 'done' | 'already' | 'locked' | 'error';
-type StudentTab = 'scan' | 'istoric' | 'profil';
+type StudentTab = 'scan' | 'istoric' | 'orar' | 'profil';
 
 function buildDocId(prenume: string, nume: string, clasa: string, data: string, materieId: string): string {
   const normalize = (s: string) =>
@@ -39,6 +40,7 @@ function buildDocId(prenume: string, nume: string, clasa: string, data: string, 
 const TAB_ITEMS: { id: StudentTab; icon: string; label: string }[] = [
   { id: 'scan',    icon: '📷', label: 'Scanează QR' },
   { id: 'istoric', icon: '📋', label: 'Prezența mea' },
+  { id: 'orar',    icon: '📅', label: 'Orar' },
 ];
 
 export default function StudentDashboardPage() {
@@ -71,6 +73,15 @@ export default function StudentDashboardPage() {
   const [editClasa, setEditClasa]       = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg]     = useState('');
+
+  // ── Orar elev ────────────────────────────────────────────────────────────
+  const ZILE_ELEV  = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri'] as const;
+  const ORE_NR_ELEV = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+  const ORE_INTERVAL_ELEV = ['08:00–08:50','09:00–09:50','10:00–10:50','11:00–11:50',
+                             '12:00–12:50','13:00–13:50','14:00–14:50','15:00–15:50'];
+  const [orarOre, setOrarOre]           = useState<OraDeClasa[]>([]);
+  const [orarLoading, setOrarLoading]   = useState(false);
+  const [schimbari, setSchimbari]       = useState<Schimbare[]>([]);
 
   const isOnline = useOnlineStatus();
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') !== 'false');
@@ -155,6 +166,29 @@ export default function StudentDashboardPage() {
   }, [user?.email]);
 
   useEffect(() => { loadRecords(); }, [loadRecords]);
+
+  useEffect(() => {
+    if (dashTab !== 'orar' || !profile) return;
+    setOrarLoading(true);
+    Promise.all([
+      getDoc(doc(db, 'orar', profile.clasa)),
+      getDocs(query(collection(db, 'schimbari'), orderBy('creatLa', 'desc'))),
+    ]).then(([orarSnap, schSnap]) => {
+      setOrarOre(orarSnap.exists() ? (orarSnap.data().ore ?? []) : []);
+      setSchimbari(schSnap.docs
+        .map(d => ({
+          id: d.id,
+          data: d.data().data ?? '',
+          clasa: d.data().clasa ?? '',
+          titlu: d.data().titlu ?? '',
+          descriere: d.data().descriere ?? '',
+          creatLa: d.data().creatLa?.toDate() ?? new Date(),
+        }))
+        .filter(s => s.clasa === profile.clasa || s.clasa === 'Toate clasele')
+      );
+      setOrarLoading(false);
+    }).catch(() => setOrarLoading(false));
+  }, [dashTab, profile]);
 
   // ── Verificare prezență când vine QR param ───────────────────────────────
   useEffect(() => {
@@ -813,6 +847,91 @@ export default function StudentDashboardPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ TAB: Orar ══ */}
+        {dashTab === 'orar' && (
+          <div style={{ maxWidth: 860, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {orarLoading ? (
+              <div className="sd-loading-text">Se încarcă orarul...</div>
+            ) : (
+              <>
+                <div className="sd-section-title">Orarul clasei {profile?.clasa}</div>
+
+                {orarOre.length === 0 ? (
+                  <div className="empty-state">Orarul nu a fost configurat încă de administrator.</div>
+                ) : (
+                  <div className="orar-grid-scroll">
+                    <table className="orar-table orar-table--readonly">
+                      <thead>
+                        <tr>
+                          <th className="orar-th-ora">Ora</th>
+                          {ZILE_ELEV.map(zi => <th key={zi} className="orar-th-zi">{zi}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ORE_NR_ELEV.map((nr, idx) => {
+                          const hasAny = ZILE_ELEV.some(zi => orarOre.find(o => o.zi === zi && o.ora === nr));
+                          if (!hasAny) return null;
+                          return (
+                            <tr key={nr}>
+                              <td className="orar-td-nr">
+                                <strong>{nr}</strong>
+                                <span className="orar-interval">{ORE_INTERVAL_ELEV[idx]}</span>
+                              </td>
+                              {ZILE_ELEV.map(zi => {
+                                const ora = orarOre.find(o => o.zi === zi && o.ora === nr);
+                                return (
+                                  <td key={zi} className={`orar-td-cell${ora ? ' filled' : ''}`}>
+                                    {ora ? (
+                                      <>
+                                        <span className="orar-materie">{ora.materie}</span>
+                                        {ora.profesor && <span className="orar-profesor">{ora.profesor}</span>}
+                                        {ora.cabinet && <span className="orar-cabinet">Cab. {ora.cabinet}</span>}
+                                      </>
+                                    ) : null}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Schimbări */}
+                <div className="sd-section-title" style={{ marginTop: 8 }}>
+                  Schimbări de orar
+                  {schimbari.length > 0 && <span className="sd-total-badge">{schimbari.length}</span>}
+                </div>
+
+                {schimbari.length === 0 ? (
+                  <div className="empty-state">Nicio schimbare anunțată.</div>
+                ) : (
+                  <div className="schimbari-list">
+                    {schimbari.map(s => (
+                      <div className="schimbare-card" key={s.id}>
+                        <div className="schimbare-header">
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span className="schimbare-data">
+                              {new Date(s.data + 'T12:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                            <span className={`badge ${s.clasa === 'Toate clasele' ? 'badge--neutral' : 'badge--info'}`}>
+                              {s.clasa}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="schimbare-titlu">{s.titlu}</div>
+                        {s.descriere && <div className="schimbare-desc">{s.descriere}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
