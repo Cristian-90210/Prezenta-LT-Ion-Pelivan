@@ -225,8 +225,12 @@ export default function TeacherPage() {
 
         // Load time intervals
         const intSnap = await getDoc(doc(db, 'settings', 'orar'));
-        if (intSnap.exists()) {
-          setOrarIntervale(intSnap.data().intervale ?? DEFAULT_INT_T);
+        if (intSnap.exists() && intSnap.data().intervale) {
+          setOrarIntervale(
+            intSnap.data().intervale.map(
+              (i: { start: string; sfarsit: string }) => `${i.start}–${i.sfarsit}`
+            )
+          );
         }
       } catch (err) {
         console.error(err);
