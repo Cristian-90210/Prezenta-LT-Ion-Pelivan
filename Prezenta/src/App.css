@@ -2489,10 +2489,17 @@ html, body, #root {
   font-weight: 800;
   color: var(--text);
 }
+.schimbare-materii {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
 .schimbare-desc {
   font-size: 0.85rem;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 6px;
   line-height: 1.5;
 }
 

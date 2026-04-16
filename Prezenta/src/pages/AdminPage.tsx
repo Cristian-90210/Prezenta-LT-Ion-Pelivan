@@ -118,12 +118,26 @@ export default function AdminPage() {
   const [auditLoading, setAuditLoading] = useState(false);
 
   // Orar
-  const ZILE = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri'] as const;
+  const ZILE   = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri'] as const;
   const ORE_NR = [1, 2, 3, 4, 5, 6, 7, 8] as const;
-  const ORE_INTERVAL = ['08:00–08:50','09:00–09:50','10:00–10:50','11:00–11:50',
-                        '12:00–12:50','13:00–13:50','14:00–14:50','15:00–15:50'];
 
-  const [orarOrarSubtab, setOrarOrarSubtab] = useState<'orar'|'schimbari'>('orar');
+  const DEFAULT_INTERVALE = [
+    { ora: 1, start: '08:00', sfarsit: '08:50' },
+    { ora: 2, start: '09:00', sfarsit: '09:50' },
+    { ora: 3, start: '10:00', sfarsit: '10:50' },
+    { ora: 4, start: '11:00', sfarsit: '11:50' },
+    { ora: 5, start: '12:00', sfarsit: '12:50' },
+    { ora: 6, start: '13:00', sfarsit: '13:50' },
+    { ora: 7, start: '14:00', sfarsit: '14:50' },
+    { ora: 8, start: '15:00', sfarsit: '15:50' },
+  ];
+
+  const [intervale, setIntervale]           = useState(DEFAULT_INTERVALE);
+  const [intervaleSaving, setIntervaleSaving] = useState(false);
+  const [intervaleMsg, setIntervaleMsg]     = useState('');
+  const ORE_INTERVAL = intervale.map(i => `${i.start}–${i.sfarsit}`);
+
+  const [orarOrarSubtab, setOrarOrarSubtab] = useState<'orar'|'schimbari'|'setari-orar'>('orar');
   const [orarClasa, setOrarClasa]           = useState('');
   const [orarOre, setOrarOre]               = useState<OraDeClasa[]>([]);
   const [orarLoading, setOrarLoading]       = useState(false);
@@ -139,6 +153,8 @@ export default function AdminPage() {
   const [newSchClasa, setNewSchClasa]       = useState('Toate clasele');
   const [newSchTitlu, setNewSchTitlu]       = useState('');
   const [newSchDesc, setNewSchDesc]         = useState('');
+  const [newSchMaterieVeche, setNewSchMaterieVeche] = useState('');
+  const [newSchMaterieNoua, setNewSchMaterieNoua]   = useState('');
   const [schSaving, setSchSaving]           = useState(false);
 
   // ── Sortare tabele ────────────────────────────────────────────────────────
@@ -202,6 +218,27 @@ export default function AdminPage() {
     sessionStorage.removeItem('adminLoggedIn');
     setLoggedIn(false);
     setSidebarOpen(false);
+  }
+
+  // ── Intervale functions ───────────────────────────────────────────────────
+  async function loadIntervale() {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'orar'));
+      if (snap.exists() && snap.data().intervale) setIntervale(snap.data().intervale);
+    } catch {}
+  }
+
+  async function saveIntervale() {
+    setIntervaleSaving(true);
+    setIntervaleMsg('');
+    try {
+      await setDoc(doc(db, 'settings', 'orar'), { intervale });
+      setIntervaleMsg('✓ Salvat!');
+    } catch {
+      setIntervaleMsg('Eroare la salvare.');
+    }
+    setIntervaleSaving(false);
+    setTimeout(() => setIntervaleMsg(''), 3000);
   }
 
   // ── Orar functions ────────────────────────────────────────────────────────
@@ -272,6 +309,8 @@ export default function AdminPage() {
         clasa: d.data().clasa ?? '',
         titlu: d.data().titlu ?? '',
         descriere: d.data().descriere ?? '',
+        materieVeche: d.data().materieVeche ?? '',
+        materieNoua: d.data().materieNoua ?? '',
         creatLa: d.data().creatLa?.toDate() ?? new Date(),
       })));
     } catch {}
@@ -283,16 +322,22 @@ export default function AdminPage() {
     if (!newSchTitlu.trim()) return;
     setSchSaving(true);
     try {
-      const ref = await addDoc(collection(db, 'schimbari'), {
+      const payload: Record<string, unknown> = {
         data: newSchData, clasa: newSchClasa,
         titlu: newSchTitlu.trim(), descriere: newSchDesc.trim(),
+        materieVeche: newSchMaterieVeche.trim(),
+        materieNoua: newSchMaterieNoua.trim(),
         creatLa: Timestamp.now(),
-      });
+      };
+      const ref = await addDoc(collection(db, 'schimbari'), payload);
       setSchimbari(prev => [{
         id: ref.id, data: newSchData, clasa: newSchClasa,
-        titlu: newSchTitlu.trim(), descriere: newSchDesc.trim(), creatLa: new Date(),
+        titlu: newSchTitlu.trim(), descriere: newSchDesc.trim(),
+        materieVeche: newSchMaterieVeche.trim(), materieNoua: newSchMaterieNoua.trim(),
+        creatLa: new Date(),
       }, ...prev]);
       setNewSchTitlu(''); setNewSchDesc('');
+      setNewSchMaterieVeche(''); setNewSchMaterieNoua('');
     } catch {}
     setSchSaving(false);
   }
@@ -451,7 +496,7 @@ export default function AdminPage() {
   }, [tab, loggedIn, loadAuditLog]);
 
   useEffect(() => {
-    if (tab === 'orar' && loggedIn) loadSchimbari();
+    if (tab === 'orar' && loggedIn) { loadSchimbari(); loadIntervale(); }
   }, [tab, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleResetPassword(student: StudentRecord) {
@@ -1003,14 +1048,9 @@ export default function AdminPage() {
           <>
             {/* Sub-tab switcher */}
             <div className="orar-subtabs">
-              <button
-                className={`orar-subtab${orarOrarSubtab === 'orar' ? ' active' : ''}`}
-                onClick={() => setOrarOrarSubtab('orar')}
-              >📅 Orar clase</button>
-              <button
-                className={`orar-subtab${orarOrarSubtab === 'schimbari' ? ' active' : ''}`}
-                onClick={() => setOrarOrarSubtab('schimbari')}
-              >🔄 Schimbări</button>
+              <button className={`orar-subtab${orarOrarSubtab === 'orar' ? ' active' : ''}`} onClick={() => setOrarOrarSubtab('orar')}>📅 Orar clase</button>
+              <button className={`orar-subtab${orarOrarSubtab === 'schimbari' ? ' active' : ''}`} onClick={() => setOrarOrarSubtab('schimbari')}>🔄 Schimbări</button>
+              <button className={`orar-subtab${orarOrarSubtab === 'setari-orar' ? ' active' : ''}`} onClick={() => setOrarOrarSubtab('setari-orar')}>⏰ Ore</button>
             </div>
 
             {/* ── Orar clase ── */}
@@ -1138,6 +1178,48 @@ export default function AdminPage() {
               </>
             )}
 
+            {/* ── Setări ore ── */}
+            {orarOrarSubtab === 'setari-orar' && (
+              <div className="controls">
+                <h3 className="admin-section-title">Configurare ore (start – sfârșit)</h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+                  Modifică orele de început și sfârșit pentru fiecare pereche. Salvează pentru a actualiza orarul tuturor claselor.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {intervale.map((iv, idx) => (
+                    <div key={iv.ora} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, minWidth: 50, color: 'var(--indigo)' }}>Ora {iv.ora}</span>
+                      <div className="field" style={{ margin: 0, flex: '0 0 130px' }}>
+                        <label>Start</label>
+                        <input
+                          type="time" value={iv.start}
+                          onChange={e => setIntervale(prev => prev.map((x, i) => i === idx ? { ...x, start: e.target.value } : x))}
+                        />
+                      </div>
+                      <span style={{ color: 'var(--text-muted)', paddingTop: 20 }}>–</span>
+                      <div className="field" style={{ margin: 0, flex: '0 0 130px' }}>
+                        <label>Sfârșit</label>
+                        <input
+                          type="time" value={iv.sfarsit}
+                          onChange={e => setIntervale(prev => prev.map((x, i) => i === idx ? { ...x, sfarsit: e.target.value } : x))}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button className="btn-primary" onClick={saveIntervale} disabled={intervaleSaving}>
+                    {intervaleSaving ? 'Se salvează...' : '✓ Salvează orele'}
+                  </button>
+                  {intervaleMsg && (
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: intervaleMsg.startsWith('✓') ? 'var(--green)' : 'var(--rose)' }}>
+                      {intervaleMsg}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ── Schimbări ── */}
             {orarOrarSubtab === 'schimbari' && (
               <>
@@ -1163,6 +1245,27 @@ export default function AdminPage() {
                           onChange={e => setNewSchTitlu(e.target.value)}
                           placeholder="ex: Ora de matematică anulată"
                           required
+                        />
+                      </div>
+                    </div>
+                    <div className="control-row" style={{ flexWrap: 'wrap' }}>
+                      <div className="field" style={{ flex: '1 1 180px' }}>
+                        <label>Materie înlocuită (opțional)</label>
+                        <input
+                          type="text" value={newSchMaterieVeche}
+                          onChange={e => setNewSchMaterieVeche(e.target.value)}
+                          placeholder="ex: Matematică"
+                        />
+                      </div>
+                      <div className="field" style={{ flex: '0 0 36px', display: 'flex', alignItems: 'flex-end', paddingBottom: 2, justifyContent: 'center' }}>
+                        <span style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>→</span>
+                      </div>
+                      <div className="field" style={{ flex: '1 1 180px' }}>
+                        <label>Materie nouă (opțional)</label>
+                        <input
+                          type="text" value={newSchMaterieNoua}
+                          onChange={e => setNewSchMaterieNoua(e.target.value)}
+                          placeholder="ex: Fizică"
                         />
                       </div>
                     </div>
@@ -1203,13 +1306,18 @@ export default function AdminPage() {
                               <span className="schimbare-data">
                                 {new Date(s.data + 'T12:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
                               </span>
-                              <span className={`badge ${s.clasa === 'Toate clasele' ? 'badge--neutral' : 'badge--info'}`}>
-                                {s.clasa}
-                              </span>
+                              <span className={`badge ${s.clasa === 'Toate clasele' ? 'badge--neutral' : 'badge--info'}`}>{s.clasa}</span>
                             </div>
                             <button className="btn-delete" onClick={() => deleteSchimbare(s.id)} title="Șterge">✕</button>
                           </div>
                           <div className="schimbare-titlu">{s.titlu}</div>
+                          {(s.materieVeche || s.materieNoua) && (
+                            <div className="schimbare-materii">
+                              {s.materieVeche && <span className="badge badge--danger">{s.materieVeche}</span>}
+                              {s.materieVeche && s.materieNoua && <span style={{ color: 'var(--text-muted)' }}>→</span>}
+                              {s.materieNoua && <span className="badge badge--success">{s.materieNoua}</span>}
+                            </div>
+                          )}
                           {s.descriere && <div className="schimbare-desc">{s.descriere}</div>}
                         </div>
                       ))}
