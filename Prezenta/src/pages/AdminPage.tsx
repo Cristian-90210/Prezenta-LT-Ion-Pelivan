@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, orderBy, limit, addDoc, Timestamp } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { TEACHERS, type Teacher } from '../teachers';
@@ -7,8 +7,9 @@ import { useConfig, DEFAULT_CLASSES } from '../hooks/useConfig';
 import { useSort } from '../hooks/useSort';
 import { logAudit } from '../utils/auditLog';
 import type { AuditAction } from '../utils/auditLog';
+import type { OraDeClasa, Schimbare } from '../types';
 
-type AdminTab = 'profesori' | 'clase' | 'elevi' | 'setari' | 'audit';
+type AdminTab = 'profesori' | 'clase' | 'elevi' | 'orar' | 'audit' | 'setari';
 
 interface AuditEntry {
   id: string;
@@ -116,6 +117,30 @@ export default function AdminPage() {
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
+  // Orar
+  const ZILE = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri'] as const;
+  const ORE_NR = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+  const ORE_INTERVAL = ['08:00–08:50','09:00–09:50','10:00–10:50','11:00–11:50',
+                        '12:00–12:50','13:00–13:50','14:00–14:50','15:00–15:50'];
+
+  const [orarOrarSubtab, setOrarOrarSubtab] = useState<'orar'|'schimbari'>('orar');
+  const [orarClasa, setOrarClasa]           = useState('');
+  const [orarOre, setOrarOre]               = useState<OraDeClasa[]>([]);
+  const [orarLoading, setOrarLoading]       = useState(false);
+  const [editCell, setEditCell]             = useState<{zi: string; ora: number} | null>(null);
+  const [cellMaterie, setCellMaterie]       = useState('');
+  const [cellProfesor, setCellProfesor]     = useState('');
+  const [cellCabinet, setCellCabinet]       = useState('');
+  const [cellSaving, setCellSaving]         = useState(false);
+
+  const [schimbari, setSchimbari]           = useState<Schimbare[]>([]);
+  const [schimbariLoading, setSchimbariLoading] = useState(false);
+  const [newSchData, setNewSchData]         = useState(new Date().toISOString().split('T')[0]);
+  const [newSchClasa, setNewSchClasa]       = useState('Toate clasele');
+  const [newSchTitlu, setNewSchTitlu]       = useState('');
+  const [newSchDesc, setNewSchDesc]         = useState('');
+  const [schSaving, setSchSaving]           = useState(false);
+
   // ── Sortare tabele ────────────────────────────────────────────────────────
   const teachersSort = useSort(teachers, 'name', 'asc');
 
@@ -177,6 +202,106 @@ export default function AdminPage() {
     sessionStorage.removeItem('adminLoggedIn');
     setLoggedIn(false);
     setSidebarOpen(false);
+  }
+
+  // ── Orar functions ────────────────────────────────────────────────────────
+  async function loadOrar(clasa: string) {
+    if (!clasa) return;
+    setOrarLoading(true);
+    try {
+      const snap = await getDoc(doc(db, 'orar', clasa));
+      setOrarOre(snap.exists() ? (snap.data().ore ?? []) : []);
+    } catch {}
+    setOrarLoading(false);
+  }
+
+  function openCell(zi: string, ora: number) {
+    const existing = orarOre.find(o => o.zi === zi && o.ora === ora);
+    setCellMaterie(existing?.materie ?? '');
+    setCellProfesor(existing?.profesor ?? '');
+    setCellCabinet(existing?.cabinet ?? '');
+    setEditCell({ zi, ora });
+  }
+
+  async function saveCell() {
+    if (!editCell || !orarClasa) return;
+    setCellSaving(true);
+    let newOre: OraDeClasa[];
+    const exists = orarOre.find(o => o.zi === editCell.zi && o.ora === editCell.ora);
+    if (!cellMaterie.trim()) {
+      newOre = orarOre.filter(o => !(o.zi === editCell.zi && o.ora === editCell.ora));
+    } else if (exists) {
+      newOre = orarOre.map(o => o.zi === editCell.zi && o.ora === editCell.ora
+        ? { ...o, materie: cellMaterie.trim(), profesor: cellProfesor.trim(), cabinet: cellCabinet.trim() }
+        : o);
+    } else {
+      newOre = [...orarOre, {
+        id: `${editCell.zi}-${editCell.ora}-${Date.now()}`,
+        zi: editCell.zi, ora: editCell.ora,
+        materie: cellMaterie.trim(), profesor: cellProfesor.trim(), cabinet: cellCabinet.trim(),
+      }];
+    }
+    try {
+      await setDoc(doc(db, 'orar', orarClasa), { ore: newOre });
+      setOrarOre(newOre);
+      setEditCell(null);
+    } catch {}
+    setCellSaving(false);
+  }
+
+  async function deleteCell() {
+    if (!editCell || !orarClasa) return;
+    setCellSaving(true);
+    const newOre = orarOre.filter(o => !(o.zi === editCell.zi && o.ora === editCell.ora));
+    try {
+      await setDoc(doc(db, 'orar', orarClasa), { ore: newOre });
+      setOrarOre(newOre);
+      setEditCell(null);
+    } catch {}
+    setCellSaving(false);
+  }
+
+  // ── Schimbări functions ───────────────────────────────────────────────────
+  async function loadSchimbari() {
+    setSchimbariLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'schimbari'), orderBy('creatLa', 'desc'), limit(100)));
+      setSchimbari(snap.docs.map(d => ({
+        id: d.id,
+        data: d.data().data ?? '',
+        clasa: d.data().clasa ?? '',
+        titlu: d.data().titlu ?? '',
+        descriere: d.data().descriere ?? '',
+        creatLa: d.data().creatLa?.toDate() ?? new Date(),
+      })));
+    } catch {}
+    setSchimbariLoading(false);
+  }
+
+  async function addSchimbare(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newSchTitlu.trim()) return;
+    setSchSaving(true);
+    try {
+      const ref = await addDoc(collection(db, 'schimbari'), {
+        data: newSchData, clasa: newSchClasa,
+        titlu: newSchTitlu.trim(), descriere: newSchDesc.trim(),
+        creatLa: Timestamp.now(),
+      });
+      setSchimbari(prev => [{
+        id: ref.id, data: newSchData, clasa: newSchClasa,
+        titlu: newSchTitlu.trim(), descriere: newSchDesc.trim(), creatLa: new Date(),
+      }, ...prev]);
+      setNewSchTitlu(''); setNewSchDesc('');
+    } catch {}
+    setSchSaving(false);
+  }
+
+  async function deleteSchimbare(id: string) {
+    try {
+      await deleteDoc(doc(db, 'schimbari', id));
+      setSchimbari(prev => prev.filter(s => s.id !== id));
+    } catch {}
   }
 
   function handleLogin(e: React.FormEvent) {
@@ -325,6 +450,10 @@ export default function AdminPage() {
     if (tab === 'audit' && loggedIn) loadAuditLog();
   }, [tab, loggedIn, loadAuditLog]);
 
+  useEffect(() => {
+    if (tab === 'orar' && loggedIn) loadSchimbari();
+  }, [tab, loggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleResetPassword(student: StudentRecord) {
     try {
       await sendPasswordResetEmail(auth, student.email);
@@ -408,10 +537,11 @@ export default function AdminPage() {
 
   const ADMIN_TABS: { id: AdminTab; icon: string; label: string }[] = [
     { id: 'profesori', icon: '👩‍🏫', label: 'Profesori' },
-    { id: 'clase',     icon: '🏫', label: 'Clase' },
+    { id: 'clase',     icon: '🏫',  label: 'Clase' },
     { id: 'elevi',     icon: '👨‍🎓', label: 'Elevi' },
-    { id: 'audit',     icon: '📋', label: 'Audit' },
-    { id: 'setari',    icon: '⚙️', label: 'Setări' },
+    { id: 'orar',      icon: '📅',  label: 'Orar' },
+    { id: 'audit',     icon: '📋',  label: 'Audit' },
+    { id: 'setari',    icon: '⚙️',  label: 'Setări' },
   ];
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
@@ -864,6 +994,229 @@ export default function AdminPage() {
                   </div>
                 )}
               </div>
+            )}
+          </>
+        )}
+
+        {/* ══ Tab: Orar ══ */}
+        {tab === 'orar' && (
+          <>
+            {/* Sub-tab switcher */}
+            <div className="orar-subtabs">
+              <button
+                className={`orar-subtab${orarOrarSubtab === 'orar' ? ' active' : ''}`}
+                onClick={() => setOrarOrarSubtab('orar')}
+              >📅 Orar clase</button>
+              <button
+                className={`orar-subtab${orarOrarSubtab === 'schimbari' ? ' active' : ''}`}
+                onClick={() => setOrarOrarSubtab('schimbari')}
+              >🔄 Schimbări</button>
+            </div>
+
+            {/* ── Orar clase ── */}
+            {orarOrarSubtab === 'orar' && (
+              <>
+                <div className="controls">
+                  <h3 className="admin-section-title">Orar pe clase</h3>
+                  <div className="control-row">
+                    <div className="field">
+                      <label>Selectează clasa</label>
+                      <select
+                        value={orarClasa}
+                        onChange={e => { setOrarClasa(e.target.value); loadOrar(e.target.value); setEditCell(null); }}
+                      >
+                        <option value="">— Alege clasa —</option>
+                        {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {orarClasa && (
+                  <>
+                    {orarLoading ? (
+                      <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Se încarcă orarul...</div>
+                    ) : (
+                      <div className="orar-wrap">
+                        <div className="orar-grid-scroll">
+                          <table className="orar-table">
+                            <thead>
+                              <tr>
+                                <th className="orar-th-ora">Ora</th>
+                                {ZILE.map(zi => <th key={zi} className="orar-th-zi">{zi}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ORE_NR.map((nr, idx) => (
+                                <tr key={nr}>
+                                  <td className="orar-td-nr">
+                                    <strong>{nr}</strong>
+                                    <span className="orar-interval">{ORE_INTERVAL[idx]}</span>
+                                  </td>
+                                  {ZILE.map(zi => {
+                                    const ora = orarOre.find(o => o.zi === zi && o.ora === nr);
+                                    const isEditing = editCell?.zi === zi && editCell?.ora === nr;
+                                    return (
+                                      <td
+                                        key={zi}
+                                        className={`orar-td-cell${isEditing ? ' editing' : ''}${ora ? ' filled' : ''}`}
+                                        onClick={() => !isEditing && openCell(zi, nr)}
+                                      >
+                                        {ora ? (
+                                          <>
+                                            <span className="orar-materie">{ora.materie}</span>
+                                            {ora.profesor && <span className="orar-profesor">{ora.profesor}</span>}
+                                            {ora.cabinet && <span className="orar-cabinet">Cab. {ora.cabinet}</span>}
+                                          </>
+                                        ) : (
+                                          <span className="orar-empty">+</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Edit panel */}
+                        {editCell && (
+                          <div className="orar-edit-panel">
+                            <h4 className="orar-edit-title">
+                              {editCell.zi} · Ora {editCell.ora} ({ORE_INTERVAL[editCell.ora - 1]})
+                            </h4>
+                            <div className="control-row" style={{ flexWrap: 'wrap' }}>
+                              <div className="field" style={{ flex: '1 1 160px' }}>
+                                <label>Materie</label>
+                                <input
+                                  type="text" value={cellMaterie}
+                                  onChange={e => setCellMaterie(e.target.value)}
+                                  placeholder="ex: Matematică"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="field" style={{ flex: '1 1 160px' }}>
+                                <label>Profesor</label>
+                                <input
+                                  type="text" value={cellProfesor}
+                                  onChange={e => setCellProfesor(e.target.value)}
+                                  placeholder="ex: Ion Popescu"
+                                />
+                              </div>
+                              <div className="field" style={{ flex: '1 1 100px' }}>
+                                <label>Cabinet</label>
+                                <input
+                                  type="text" value={cellCabinet}
+                                  onChange={e => setCellCabinet(e.target.value)}
+                                  placeholder="ex: 201"
+                                />
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                              <button className="btn-primary" onClick={saveCell} disabled={cellSaving} style={{ flex: 1 }}>
+                                {cellSaving ? 'Se salvează...' : '✓ Salvează'}
+                              </button>
+                              {orarOre.find(o => o.zi === editCell.zi && o.ora === editCell.ora) && (
+                                <button className="btn-delete" onClick={deleteCell} disabled={cellSaving} title="Șterge ora">
+                                  ✕ Șterge
+                                </button>
+                              )}
+                              <button className="btn-action" onClick={() => setEditCell(null)} disabled={cellSaving}>
+                                Anulează
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+                {!orarClasa && (
+                  <div className="empty-state">Selectează o clasă pentru a edita orarul.</div>
+                )}
+              </>
+            )}
+
+            {/* ── Schimbări ── */}
+            {orarOrarSubtab === 'schimbari' && (
+              <>
+                <div className="controls">
+                  <h3 className="admin-section-title">Adaugă schimbare</h3>
+                  <form onSubmit={addSchimbare}>
+                    <div className="control-row" style={{ flexWrap: 'wrap' }}>
+                      <div className="field" style={{ flex: '0 0 150px' }}>
+                        <label>Data</label>
+                        <input type="date" value={newSchData} onChange={e => setNewSchData(e.target.value)} />
+                      </div>
+                      <div className="field" style={{ flex: '0 0 160px' }}>
+                        <label>Clasa afectată</label>
+                        <select value={newSchClasa} onChange={e => setNewSchClasa(e.target.value)}>
+                          <option value="Toate clasele">Toate clasele</option>
+                          {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="field" style={{ flex: '1 1 200px' }}>
+                        <label>Titlu</label>
+                        <input
+                          type="text" value={newSchTitlu}
+                          onChange={e => setNewSchTitlu(e.target.value)}
+                          placeholder="ex: Ora de matematică anulată"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="field" style={{ marginTop: 4 }}>
+                      <label>Descriere (opțional)</label>
+                      <textarea
+                        value={newSchDesc}
+                        onChange={e => setNewSchDesc(e.target.value)}
+                        placeholder="Detalii suplimentare..."
+                        rows={2}
+                        style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: '0.95rem',
+                          padding: '10px 14px', border: '2px solid var(--border)',
+                          borderRadius: 'var(--radius-sm)', background: 'var(--surface)',
+                          color: 'var(--text)', width: '100%' }}
+                      />
+                    </div>
+                    <button type="submit" className="btn-primary" disabled={schSaving} style={{ marginTop: 8 }}>
+                      {schSaving ? 'Se adaugă...' : '+ Adaugă schimbare'}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="controls" style={{ marginTop: 8 }}>
+                  <h3 className="admin-section-title">
+                    Schimbări adăugate
+                    {!schimbariLoading && <span style={{ fontWeight: 400, marginLeft: 8 }}>({schimbari.length})</span>}
+                  </h3>
+                  {schimbariLoading ? (
+                    <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Se încarcă...</div>
+                  ) : schimbari.length === 0 ? (
+                    <div className="empty-state">Nicio schimbare adăugată.</div>
+                  ) : (
+                    <div className="schimbari-list">
+                      {schimbari.map(s => (
+                        <div className="schimbare-card" key={s.id}>
+                          <div className="schimbare-header">
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span className="schimbare-data">
+                                {new Date(s.data + 'T12:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                              <span className={`badge ${s.clasa === 'Toate clasele' ? 'badge--neutral' : 'badge--info'}`}>
+                                {s.clasa}
+                              </span>
+                            </div>
+                            <button className="btn-delete" onClick={() => deleteSchimbare(s.id)} title="Șterge">✕</button>
+                          </div>
+                          <div className="schimbare-titlu">{s.titlu}</div>
+                          {s.descriere && <div className="schimbare-desc">{s.descriere}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </>
         )}
