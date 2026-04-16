@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "prezenta",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "materie", "order": "ASCENDING" },
+        { "fieldPath": "data",    "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

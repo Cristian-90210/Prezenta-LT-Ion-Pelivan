@@ -299,6 +299,7 @@ export default function TeacherPage() {
     try {
       const q = query(
         collection(db, 'prezenta'),
+        where('materie', '==', currentTeacher.subject),
         where('data', '>=', rangeFrom),
         where('data', '<=', rangeTo)
       );
