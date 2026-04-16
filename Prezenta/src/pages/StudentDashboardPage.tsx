@@ -75,10 +75,11 @@ export default function StudentDashboardPage() {
   const [profileMsg, setProfileMsg]     = useState('');
 
   // ── Orar elev ────────────────────────────────────────────────────────────
-  const ZILE_ELEV  = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri'] as const;
+  const ZILE_ELEV   = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri'] as const;
   const ORE_NR_ELEV = [1, 2, 3, 4, 5, 6, 7, 8] as const;
-  const ORE_INTERVAL_ELEV = ['08:00–08:50','09:00–09:50','10:00–10:50','11:00–11:50',
-                             '12:00–12:50','13:00–13:50','14:00–14:50','15:00–15:50'];
+  const DEFAULT_INT = ['08:00–08:50','09:00–09:50','10:00–10:50','11:00–11:50',
+                       '12:00–12:50','13:00–13:50','14:00–14:50','15:00–15:50'];
+  const [oreIntervale, setOreIntervale] = useState<string[]>(DEFAULT_INT);
   const [orarOre, setOrarOre]           = useState<OraDeClasa[]>([]);
   const [orarLoading, setOrarLoading]   = useState(false);
   const [schimbari, setSchimbari]       = useState<Schimbare[]>([]);
@@ -173,8 +174,12 @@ export default function StudentDashboardPage() {
     Promise.all([
       getDoc(doc(db, 'orar', profile.clasa)),
       getDocs(query(collection(db, 'schimbari'), orderBy('creatLa', 'desc'))),
-    ]).then(([orarSnap, schSnap]) => {
+      getDoc(doc(db, 'settings', 'orar')),
+    ]).then(([orarSnap, schSnap, setSnap]) => {
       setOrarOre(orarSnap.exists() ? (orarSnap.data().ore ?? []) : []);
+      if (setSnap.exists() && setSnap.data().intervale) {
+        setOreIntervale(setSnap.data().intervale.map((i: {start: string; sfarsit: string}) => `${i.start}–${i.sfarsit}`));
+      }
       setSchimbari(schSnap.docs
         .map(d => ({
           id: d.id,
@@ -182,6 +187,8 @@ export default function StudentDashboardPage() {
           clasa: d.data().clasa ?? '',
           titlu: d.data().titlu ?? '',
           descriere: d.data().descriere ?? '',
+          materieVeche: d.data().materieVeche ?? '',
+          materieNoua: d.data().materieNoua ?? '',
           creatLa: d.data().creatLa?.toDate() ?? new Date(),
         }))
         .filter(s => s.clasa === profile.clasa || s.clasa === 'Toate clasele')
@@ -879,7 +886,7 @@ export default function StudentDashboardPage() {
                             <tr key={nr}>
                               <td className="orar-td-nr">
                                 <strong>{nr}</strong>
-                                <span className="orar-interval">{ORE_INTERVAL_ELEV[idx]}</span>
+                                <span className="orar-interval">{oreIntervale[idx]}</span>
                               </td>
                               {ZILE_ELEV.map(zi => {
                                 const ora = orarOre.find(o => o.zi === zi && o.ora === nr);
@@ -926,6 +933,13 @@ export default function StudentDashboardPage() {
                           </div>
                         </div>
                         <div className="schimbare-titlu">{s.titlu}</div>
+                        {(s.materieVeche || s.materieNoua) && (
+                          <div className="schimbare-materii">
+                            {s.materieVeche && <span className="badge badge--danger">{s.materieVeche}</span>}
+                            {s.materieVeche && s.materieNoua && <span style={{ color: 'var(--text-muted)' }}>→</span>}
+                            {s.materieNoua && <span className="badge badge--success">{s.materieNoua}</span>}
+                          </div>
+                        )}
                         {s.descriere && <div className="schimbare-desc">{s.descriere}</div>}
                       </div>
                     ))}
