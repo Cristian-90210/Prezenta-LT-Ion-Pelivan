@@ -4,6 +4,7 @@ import {
   sendEmailVerification, sendPasswordResetEmail,
   signInWithPopup, GoogleAuthProvider,
   browserLocalPersistence, browserSessionPersistence, setPersistence,
+  signOut,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -35,6 +36,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === 'true');
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') !== 'false');
 
@@ -112,6 +114,11 @@ export default function AuthPage() {
     try {
       await applyPersistence();
       await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+      if (!auth.currentUser?.emailVerified) {
+        await signOut(auth);
+        setError('Emailul nu a fost verificat. Deschide linkul primit în inbox și încearcă din nou.');
+        return;
+      }
     } catch (err: any) {
       setError(authErrorMsg(err.code));
     } finally {
@@ -139,8 +146,9 @@ export default function AuthPage() {
         clasa,
         email: email.trim().toLowerCase(),
       });
-      // Trimite email de verificare — ignorăm eroarea dacă eșuează (cont creat oricum)
-      sendEmailVerification(cred.user).catch(() => {});
+      await sendEmailVerification(cred.user);
+      await signOut(auth);
+      setVerificationSent(true);
     } catch (err: any) {
       setError(authErrorMsg(err.code));
     } finally {
@@ -172,7 +180,25 @@ export default function AuthPage() {
 
       <div className="auth-card">
 
-        {mode === 'reset' ? (
+        {verificationSent ? (
+          /* ── Verificare email trimis ── */
+          <div className="auth-inner">
+            <div className="reset-success">
+              <div className="reset-success-icon">📧</div>
+              <p className="reset-success-title">Verifică emailul!</p>
+              <p className="reset-success-sub">
+                Am trimis un link de verificare la <strong>{email}</strong>.
+                Deschide emailul și apasă linkul pentru a activa contul.
+              </p>
+              <button
+                className="btn-primary"
+                onClick={() => { setVerificationSent(false); switchMode('login'); }}
+              >
+                ← Înapoi la conectare
+              </button>
+            </div>
+          </div>
+        ) : mode === 'reset' ? (
           /* ── Reset parolă ── */
           <div className="auth-inner">
             <h2 className="auth-title">Resetare parolă</h2>
